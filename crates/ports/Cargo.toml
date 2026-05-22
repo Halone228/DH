@@ -1,0 +1,15 @@
+[package]
+name = "dayhelper-ports"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+async-trait = { workspace = true }
+chrono = { workspace = true }
+dayhelper-domain = { workspace = true }
+serde = { workspace = true }
+thiserror = { workspace = true }
+uuid = { workspace = true }

@@ -1,0 +1,127 @@
+[workspace]
+resolver = "2"
+members = [
+    "crates/domain",
+    "crates/ports",
+    "crates/application",
+    "crates/adapter-sqlite",
+    "crates/adapter-telegram",
+    "crates/adapter-system",
+    "crates/scheduler",
+    "crates/bot",
+    "crates/tma",
+    "crates/server-desktop-api",
+    "crates/app",
+
+    # Desktop client (Linux, CLI)
+    "crates/protocol",
+    "crates/desktop-domain",
+    "crates/desktop-ports",
+    "crates/desktop-application",
+    "crates/desktop-adapter-dbus",
+    "crates/desktop-adapter-http",
+    "crates/desktop-adapter-sqlite",
+    "crates/desktop-adapter-wayland",
+    "crates/desktop-app",
+]
+
+[workspace.package]
+edition = "2021"
+rust-version = "1.78"
+license = "MIT OR Apache-2.0"
+publish = false
+
+[workspace.dependencies]
+# Async runtime + utilities
+tokio = { version = "1", features = ["full"] }
+async-trait = "0.1"
+futures = "0.3"
+
+# Errors
+thiserror = "1"
+anyhow = "1"
+
+# Logging
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+
+# Time
+chrono = { version = "0.4", default-features = false, features = ["clock", "serde", "std"] }
+chrono-tz = { version = "0.9", features = ["serde"] }
+
+# Identity & data
+uuid = { version = "1", features = ["v4", "serde"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+
+# Randomness
+rand = "0.8"
+
+# Storage
+sqlx = { version = "0.7", default-features = false, features = [
+    "runtime-tokio-rustls",
+    "sqlite",
+    "chrono",
+    "uuid",
+    "macros",
+    "migrate",
+] }
+
+# Telegram
+teloxide = { version = "0.13", default-features = false, features = ["macros", "rustls"] }
+
+# HTTP / TMA
+axum = { version = "0.7", features = ["macros"] }
+tower-http = { version = "0.5", features = ["cors", "trace"] }
+
+# initData verification
+hmac = "0.12"
+sha2 = "0.10"
+hex = "0.4"
+url = "2"
+
+# Config
+dotenvy = "0.15"
+
+# Desktop client deps
+clap = { version = "4", features = ["derive", "env"] }
+reqwest = { version = "0.12", default-features = false, features = ["json", "rustls-tls"] }
+notify-rust = "4"
+directories = "5"
+tokio-stream = "0.1"
+
+# Wayland (wlroots-family compositors: niri, sway, hyprland, river, wayfire)
+wayland-client = "0.31"
+wayland-protocols = { version = "0.32", features = ["client", "staging"] }
+wayland-protocols-wlr = { version = "0.3", features = ["client"] }
+
+# Internal crates (use path = ... so workspace edits propagate immediately)
+dayhelper-domain = { path = "crates/domain" }
+dayhelper-ports = { path = "crates/ports" }
+dayhelper-application = { path = "crates/application" }
+dayhelper-adapter-sqlite = { path = "crates/adapter-sqlite" }
+dayhelper-adapter-telegram = { path = "crates/adapter-telegram" }
+dayhelper-adapter-system = { path = "crates/adapter-system" }
+dayhelper-scheduler = { path = "crates/scheduler" }
+dayhelper-bot = { path = "crates/bot" }
+dayhelper-tma = { path = "crates/tma" }
+dayhelper-server-desktop-api = { path = "crates/server-desktop-api" }
+
+dayhelper-protocol = { path = "crates/protocol" }
+dayhelper-desktop-domain = { path = "crates/desktop-domain" }
+dayhelper-desktop-ports = { path = "crates/desktop-ports" }
+dayhelper-desktop-application = { path = "crates/desktop-application" }
+dayhelper-desktop-adapter-dbus = { path = "crates/desktop-adapter-dbus" }
+dayhelper-desktop-adapter-http = { path = "crates/desktop-adapter-http" }
+dayhelper-desktop-adapter-sqlite = { path = "crates/desktop-adapter-sqlite" }
+dayhelper-desktop-adapter-wayland = { path = "crates/desktop-adapter-wayland" }
+
+[profile.dev]
+opt-level = 0
+debug = true
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 1
+strip = "symbols"

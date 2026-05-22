@@ -1,0 +1,16 @@
+[package]
+name = "dayhelper-desktop-adapter-http"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+async-trait = { workspace = true }
+dayhelper-desktop-domain = { workspace = true }
+dayhelper-desktop-ports = { workspace = true }
+dayhelper-protocol = { workspace = true }
+reqwest = { workspace = true }
+serde_json = { workspace = true }
+tracing = { workspace = true }

@@ -1,0 +1,19 @@
+[package]
+name = "dayhelper-adapter-sqlite"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+async-trait = { workspace = true }
+chrono = { workspace = true }
+chrono-tz = { workspace = true }
+dayhelper-domain = { workspace = true }
+dayhelper-ports = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sqlx = { workspace = true }
+tracing = { workspace = true }
+uuid = { workspace = true }

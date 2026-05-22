@@ -1,0 +1,27 @@
+[package]
+name = "dayhelper-desktop-app"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "dayhelper-cli"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = { workspace = true }
+chrono = { workspace = true }
+clap = { workspace = true }
+dayhelper-desktop-adapter-dbus = { workspace = true }
+dayhelper-desktop-adapter-http = { workspace = true }
+dayhelper-desktop-adapter-sqlite = { workspace = true }
+dayhelper-desktop-adapter-wayland = { workspace = true }
+dayhelper-desktop-application = { workspace = true }
+dayhelper-desktop-domain = { workspace = true }
+dayhelper-desktop-ports = { workspace = true }
+directories = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }

@@ -1,0 +1,27 @@
+[package]
+name = "dayhelper-tma"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[dependencies]
+async-trait = { workspace = true }
+axum = { workspace = true }
+chrono = { workspace = true }
+chrono-tz = { workspace = true }
+dayhelper-application = { workspace = true }
+dayhelper-domain = { workspace = true }
+dayhelper-ports = { workspace = true }
+dayhelper-scheduler = { workspace = true }
+hex = { workspace = true }
+hmac = { workspace = true }
+serde = { workspace = true }
+serde_json = { workspace = true }
+sha2 = { workspace = true }
+tokio = { workspace = true }
+tower-http = { workspace = true }
+tracing = { workspace = true }
+url = { workspace = true }
+uuid = { workspace = true }

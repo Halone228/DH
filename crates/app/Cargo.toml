@@ -1,0 +1,31 @@
+[package]
+name = "dayhelper-app"
+version = "0.1.0"
+edition.workspace = true
+rust-version.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[[bin]]
+name = "dayhelper"
+path = "src/main.rs"
+
+[dependencies]
+anyhow = { workspace = true }
+axum = { workspace = true }
+chrono-tz = { workspace = true }
+dayhelper-adapter-sqlite = { workspace = true }
+dayhelper-adapter-system = { workspace = true }
+dayhelper-adapter-telegram = { workspace = true }
+dayhelper-application = { workspace = true }
+dayhelper-bot = { workspace = true }
+dayhelper-domain = { workspace = true }
+dayhelper-ports = { workspace = true }
+dayhelper-scheduler = { workspace = true }
+dayhelper-server-desktop-api = { workspace = true }
+dayhelper-tma = { workspace = true }
+dotenvy = { workspace = true }
+teloxide = { workspace = true }
+tokio = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
