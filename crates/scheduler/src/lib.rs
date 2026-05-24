@@ -77,24 +77,31 @@ impl Scheduler {
         }
     }
 
-    /// Drives all loops. Returns only on task cancellation.
-    pub async fn run(self: Arc<Self>) {
+    /// Drives all loops. Stops when `shutdown` fires.
+    pub async fn run(self: Arc<Self>, mut shutdown: tokio::sync::broadcast::Receiver<()>) {
+        let mut fire_shutdown = shutdown.resubscribe();
         let fire = {
             let s = self.clone();
-            tokio::spawn(async move { s.fire_loop().await })
+            tokio::spawn(async move { s.fire_loop(&mut fire_shutdown).await })
         };
+        let mut plan_shutdown = shutdown.resubscribe();
         let plan = {
             let s = self.clone();
-            tokio::spawn(async move { s.nudge_planner_loop().await })
+            tokio::spawn(async move { s.nudge_planner_loop(&mut plan_shutdown).await })
         };
+        let mut prune_shutdown = shutdown.resubscribe();
         let prune = {
             let s = self.clone();
-            tokio::spawn(async move { s.prune_loop().await })
+            tokio::spawn(async move { s.prune_loop(&mut prune_shutdown).await })
         };
+
+        // Wait for shutdown signal, then let the spawned tasks finish.
+        let _ = shutdown.recv().await;
+        info!("scheduler received shutdown signal");
         let _ = tokio::join!(fire, plan, prune);
     }
 
-    async fn fire_loop(self: Arc<Self>) {
+    async fn fire_loop(self: Arc<Self>, shutdown: &mut tokio::sync::broadcast::Receiver<()>) {
         loop {
             loop {
                 match self.fire.tick().await {
@@ -123,15 +130,26 @@ impl Scheduler {
                 _ = self.wakeup.notified() => {
                     debug!("scheduler woken externally");
                 }
+                _ = shutdown.recv() => {
+                    info!("fire_loop shutting down");
+                    return;
+                }
             }
         }
     }
 
-    async fn nudge_planner_loop(self: Arc<Self>) {
+    async fn nudge_planner_loop(self: Arc<Self>, shutdown: &mut tokio::sync::broadcast::Receiver<()>) {
         let mut tick = tokio::time::interval(NUDGE_PLAN_INTERVAL);
         loop {
-            tick.tick().await;
-            self.plan_nudges_round().await;
+            tokio::select! {
+                _ = tick.tick() => {
+                    self.plan_nudges_round().await;
+                }
+                _ = shutdown.recv() => {
+                    info!("nudge_planner_loop shutting down");
+                    return;
+                }
+            }
         }
     }
 
@@ -171,16 +189,29 @@ impl Scheduler {
         self.wakeup.notify_one();
     }
 
-    async fn prune_loop(self: Arc<Self>) {
+    async fn prune_loop(self: Arc<Self>, shutdown: &mut tokio::sync::broadcast::Receiver<()>) {
         // First tick after a short delay so we don't fight with bootstrap;
         // subsequent ticks every 24h.
-        tokio::time::sleep(std::time::Duration::from_secs(60)).await;
+        tokio::select! {
+            _ = tokio::time::sleep(std::time::Duration::from_secs(60)) => {}
+            _ = shutdown.recv() => {
+                info!("prune_loop shutting down");
+                return;
+            }
+        }
         let mut tick = tokio::time::interval(PRUNE_INTERVAL);
         loop {
-            tick.tick().await;
-            match self.prune.execute().await {
-                Ok(_) => {}
-                Err(e) => error!(error = %e, "prune failed"),
+            tokio::select! {
+                _ = tick.tick() => {
+                    match self.prune.execute().await {
+                        Ok(_) => {}
+                        Err(e) => error!(error = %e, "prune failed"),
+                    }
+                }
+                _ = shutdown.recv() => {
+                    info!("prune_loop shutting down");
+                    return;
+                }
             }
         }
     }

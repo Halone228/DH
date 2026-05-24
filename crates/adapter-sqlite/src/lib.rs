@@ -3,6 +3,7 @@
 //! Migrations live in `crates/adapter-sqlite/migrations/`. Run them via
 //! `Pool::migrate`, exposed by [`migrate`].
 
+pub mod backup;
 mod desktop_activity_repo;
 mod desktop_token_repo;
 mod job_queue;

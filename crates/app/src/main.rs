@@ -93,7 +93,7 @@ async fn main() -> Result<()> {
                 .await
                 .expect("bind http");
             info!(%bind_addr, "http listening (tma + desktop)");
-            let shutdown_signal = async {
+            let shutdown_signal = async move {
                 let _ = shutdown_rx.recv().await;
             };
             axum::serve(listener, app)
