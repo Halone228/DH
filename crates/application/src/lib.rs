@@ -16,7 +16,7 @@ pub use errors::AppError;
 pub use use_cases::accept_desktop_sync::AcceptDesktopSync;
 pub use use_cases::cancel_reminder::CancelReminder;
 pub use use_cases::create_reminder::{CreateReminder, CreateReminderCommand};
-pub use use_cases::ensure_user::EnsureUser;
+pub use use_cases::ensure_user::{EnsureResult, EnsureUser};
 pub use use_cases::fire_due_jobs::FireDueJobs;
 pub use use_cases::issue_pair_code::IssuePairCode;
 pub use use_cases::list_reminders::ListReminders;

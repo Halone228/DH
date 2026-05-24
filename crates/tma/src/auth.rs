@@ -153,7 +153,7 @@ impl FromRequestParts<TmaState> for AuthedUser {
         })?;
 
         let tg_id = verify(&init_data, &state.bot_token)?;
-        let user = state
+        let result = state
             .ensure_user
             .execute(tg_id, state.default_timezone)
             .await
@@ -164,7 +164,7 @@ impl FromRequestParts<TmaState> for AuthedUser {
                     message: "ensure_user failed",
                 }
             })?;
-        Ok(AuthedUser(user))
+        Ok(AuthedUser(result.user().clone()))
     }
 }
 

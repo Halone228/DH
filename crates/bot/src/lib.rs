@@ -7,8 +7,8 @@ use std::sync::Arc;
 use chrono_tz::Tz;
 use chrono::{Offset, TimeZone};
 use dayhelper_application::{
-    CancelReminder, CreateReminder, CreateReminderCommand, EnsureUser, IssuePairCode,
-    ListReminders, UpdateNudgeSettings, UpdateTimezone,
+    CancelReminder, CreateReminder, CreateReminderCommand, EnsureResult, EnsureUser,
+    IssuePairCode, ListReminders, UpdateNudgeSettings, UpdateTimezone,
 };
 use dayhelper_domain::{Recurrence, ReminderId, Weekday};
 use dayhelper_scheduler::SchedulerHandle;
@@ -90,13 +90,22 @@ async fn handle_command(
         .execute(telegram_id, deps.default_timezone)
         .await
         .map_err(into_anyhow)?;
+    let is_new = matches!(user, EnsureResult::New(_));
+    let user = user.user().clone();
 
     match cmd {
         Command::Start => {
-            let text = format!(
-                "Привет! Я помогу с напоминаниями и не дам прокрастинировать.\n\nОткрой приложение: {}",
-                deps.tma_url
-            );
+            let text = if is_new {
+                format!(
+                    "Привет! 👋 Я DayHelper — напоминания и анти-прокрастинация.\n\n\
+                     📱 Мини-приложение: {}\n\
+                     🖥️ Desktop-клиент: отправь /pair\n\n\
+                     Все команды: /help",
+                    deps.tma_url
+                )
+            } else {
+                format!("С возвращением! Открой приложение: {}", deps.tma_url)
+            };
             bot.send_message(msg.chat.id, text).await?;
         }
         Command::Help => {

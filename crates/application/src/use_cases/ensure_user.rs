@@ -6,6 +6,22 @@ use dayhelper_ports::UserRepo;
 
 use crate::AppError;
 
+/// Result of [`EnsureUser::execute`] — distinguishes first-time users from
+/// returning ones so callers can tailor onboarding messages.
+#[derive(Debug)]
+pub enum EnsureResult {
+    New(User),
+    Existing(User),
+}
+
+impl EnsureResult {
+    pub fn user(&self) -> &User {
+        match self {
+            EnsureResult::New(u) | EnsureResult::Existing(u) => u,
+        }
+    }
+}
+
 /// Idempotent registration. Called on every `/start` and on first contact
 /// from the TMA so the rest of the system always has a `User` to work with.
 pub struct EnsureUser {
@@ -21,12 +37,12 @@ impl EnsureUser {
         &self,
         telegram_id: TelegramUserId,
         timezone: Tz,
-    ) -> Result<User, AppError> {
+    ) -> Result<EnsureResult, AppError> {
         if let Some(existing) = self.users.find_by_telegram_id(telegram_id).await? {
-            return Ok(existing);
+            return Ok(EnsureResult::Existing(existing));
         }
         let user = User::new(telegram_id, timezone);
         self.users.upsert(&user).await?;
-        Ok(user)
+        Ok(EnsureResult::New(user))
     }
 }
