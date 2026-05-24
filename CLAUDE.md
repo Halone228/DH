@@ -6,13 +6,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 `dayhelper` — a Rust Telegram bot **plus a Linux desktop client**, sharing a single Cargo workspace. Two product surfaces, three responsibilities:
 
-1. **Reminders.** One-shot, daily, weekly (any subset of weekdays), monthly. Surface: `/once`, `/daily`, `/list`, `/cancel` bot commands; later TMA REST API; also delivered to the desktop client as local notifications.
+1. **Reminders.** One-shot, daily, weekly (any subset of weekdays), monthly. Surface: `/once`, `/daily`, `/list`, `/cancel` bot commands; TMA REST API + React frontend; also delivered to the desktop client as local notifications.
 2. **Anti-procrastination nudges.** 5 randomized messages per day, per user, inside their active window (default 09:00–21:00 local). Independent of user-created reminders.
 3. **Desktop activity tracking.** A Linux daemon (`dayhelper-cli daemon`) reports which app the user has focused, splits sessions on idle, and mirrors notifications via libnotify so the user gets nudges even with the phone away. Designed to work offline-tolerant: the daemon polls the server every minute and runs all already-known notifications from a local SQLite queue.
 
 Project owner communicates in **Russian**. Code, identifiers, commits, and log lines stay in **English**. User-facing text (bot messages, nudge bank, desktop notification copy) is Russian and lives in localizable modules.
 
-The TMA frontend is **paused** (skeleton in `crates/tma/` still compiles but nothing depends on it being end-to-end). Don't add features there until the project owner unpauses it.
+The TMA frontend is **active**. The backend skeleton in `crates/tma/` compiles and exposes REST endpoints. The frontend is a React SPA with Tailwind CSS served from the same Axum server via static file serving. See the TMA frontend in `frontend/`.
 
 ## Architecture
 
