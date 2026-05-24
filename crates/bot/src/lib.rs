@@ -13,6 +13,7 @@ use dayhelper_application::{
 use dayhelper_domain::{Recurrence, ReminderId, Weekday};
 use dayhelper_scheduler::SchedulerHandle;
 use teloxide::prelude::*;
+use teloxide::types::{InlineKeyboardButton, InlineKeyboardMarkup};
 use teloxide::utils::command::BotCommands;
 use tracing::error;
 use uuid::Uuid;
@@ -31,7 +32,7 @@ pub struct BotDeps {
     pub tma_url: String,
 }
 
-#[derive(BotCommands, Clone)]
+#[derive(BotCommands, Clone, Debug)]
 #[command(rename_rule = "lowercase", description = "Команды бота:")]
 pub enum Command {
     #[command(description = "приветствие и открытие приложения")]
@@ -71,17 +72,23 @@ pub async fn setup_commands(bot: &Bot) -> anyhow::Result<()> {
 
 /// Build the dispatcher. The caller spawns `dispatch().await`.
 pub fn build_dispatcher(bot: Bot, deps: BotDeps) -> Dispatcher<Bot, anyhow::Error, teloxide::dispatching::DefaultKey> {
-    let handler = dptree::entry().branch(
-        Update::filter_message()
-            .filter_command::<Command>()
-            .endpoint(handle_command),
-    );
+    let handler = dptree::entry()
+        .branch(
+            Update::filter_message()
+                .filter_command::<Command>()
+                .endpoint(handle_command),
+        )
+        .branch(
+            Update::filter_callback_query()
+                .endpoint(handle_callback),
+        );
 
     Dispatcher::builder(bot, handler)
         .dependencies(dptree::deps![deps])
         .build()
 }
 
+#[tracing::instrument(skip(bot, deps, msg))]
 async fn handle_command(
     bot: Bot,
     msg: Message,
@@ -92,13 +99,18 @@ async fn handle_command(
         return Ok(());
     };
     let telegram_id = dayhelper_domain::TelegramUserId(from.id.0 as i64);
-    let user = deps
+    let user = match deps
         .ensure_user
         .execute(telegram_id, deps.default_timezone)
         .await
-        .map_err(into_anyhow)?;
+    {
+        Ok(u) => u,
+        Err(e) => return reply_error(&bot, msg.chat.id, e).await,
+    };
     let is_new = matches!(user, EnsureResult::New(_));
     let user = user.user().clone();
+    tracing::Span::current().record("user_id", user.id.0.to_string());
+    tracing::Span::current().record("cmd", format!("{cmd:?}"));
 
     match cmd {
         Command::Start => {
@@ -120,26 +132,35 @@ async fn handle_command(
                 .await?;
         }
         Command::List => {
-            let items = deps
+            let items = match deps
                 .list_reminders
                 .execute(user.id)
                 .await
-                .map_err(into_anyhow)?;
-            let text = if items.is_empty() {
-                "Активных напоминаний нет.".to_string()
-            } else {
-                let lines: Vec<String> = items
-                    .iter()
-                    .map(|r| format!("• {} — {}", short_id(r.id.0), r.text))
-                    .collect();
-                lines.join("\n")
+            {
+                Ok(items) => items,
+                Err(e) => return reply_error(&bot, msg.chat.id, e).await,
             };
-            bot.send_message(msg.chat.id, text).await?;
+            if items.is_empty() {
+                bot.send_message(msg.chat.id, "Активных напоминаний нет.").await?;
+            } else {
+                let keyboard: Vec<Vec<InlineKeyboardButton>> = items
+                    .iter()
+                    .map(|r| {
+                        vec![InlineKeyboardButton::callback(
+                            format!("❌ {} — {}", short_id(r.id.0), r.text),
+                            format!("cancel:{}", r.id.0),
+                        )]
+                    })
+                    .collect();
+                bot.send_message(msg.chat.id, "Напоминания (нажми чтобы отменить):")
+                    .reply_markup(InlineKeyboardMarkup::new(keyboard))
+                    .await?;
+            }
         }
         Command::Once(args) => {
             match parse_once(&args, user.timezone) {
                 Ok((at_utc, text)) => {
-                    let r = deps
+                    let r = match deps
                         .create_reminder
                         .execute(CreateReminderCommand {
                             user_id: user.id,
@@ -148,7 +169,10 @@ async fn handle_command(
                             recurrence: Recurrence::Once { at: at_utc },
                         })
                         .await
-                        .map_err(into_anyhow)?;
+                    {
+                        Ok(r) => r,
+                        Err(e) => return reply_error(&bot, msg.chat.id, e).await,
+                    };
                     deps.scheduler.wakeup();
                     bot.send_message(
                         msg.chat.id,
@@ -164,7 +188,7 @@ async fn handle_command(
         }
         Command::Daily(args) => match parse_daily(&args) {
             Ok((time, text)) => {
-                let r = deps
+                let r = match deps
                     .create_reminder
                     .execute(CreateReminderCommand {
                         user_id: user.id,
@@ -173,7 +197,10 @@ async fn handle_command(
                         recurrence: Recurrence::Daily { time },
                     })
                     .await
-                    .map_err(into_anyhow)?;
+                {
+                    Ok(r) => r,
+                    Err(e) => return reply_error(&bot, msg.chat.id, e).await,
+                };
                 deps.scheduler.wakeup();
                 bot.send_message(
                     msg.chat.id,
@@ -188,7 +215,7 @@ async fn handle_command(
         },
         Command::Weekly(args) => match parse_weekly(&args) {
             Ok((weekdays, time, text)) => {
-                let r = deps
+                let r = match deps
                     .create_reminder
                     .execute(CreateReminderCommand {
                         user_id: user.id,
@@ -197,7 +224,10 @@ async fn handle_command(
                         recurrence: Recurrence::Weekly { weekdays, time },
                     })
                     .await
-                    .map_err(into_anyhow)?;
+                {
+                    Ok(r) => r,
+                    Err(e) => return reply_error(&bot, msg.chat.id, e).await,
+                };
                 deps.scheduler.wakeup();
                 bot.send_message(
                     msg.chat.id,
@@ -215,7 +245,7 @@ async fn handle_command(
         },
         Command::Monthly(args) => match parse_monthly(&args) {
             Ok((day, time, text)) => {
-                let r = deps
+                let r = match deps
                     .create_reminder
                     .execute(CreateReminderCommand {
                         user_id: user.id,
@@ -227,7 +257,10 @@ async fn handle_command(
                         },
                     })
                     .await
-                    .map_err(into_anyhow)?;
+                {
+                    Ok(r) => r,
+                    Err(e) => return reply_error(&bot, msg.chat.id, e).await,
+                };
                 deps.scheduler.wakeup();
                 bot.send_message(
                     msg.chat.id,
@@ -244,11 +277,10 @@ async fn handle_command(
             }
         },
         Command::Pair => {
-            let code = deps
-                .issue_pair_code
-                .execute(user.id)
-                .await
-                .map_err(into_anyhow)?;
+            let code = match deps.issue_pair_code.execute(user.id).await {
+                Ok(code) => code,
+                Err(e) => return reply_error(&bot, msg.chat.id, e).await,
+            };
             bot.send_message(
                 msg.chat.id,
                 format!(
@@ -261,10 +293,9 @@ async fn handle_command(
             let trimmed = arg.trim();
             match Uuid::parse_str(trimmed) {
                 Ok(id) => {
-                    deps.cancel_reminder
-                        .execute(ReminderId(id))
-                        .await
-                        .map_err(into_anyhow)?;
+                    if let Err(e) = deps.cancel_reminder.execute(ReminderId(id)).await {
+                        return reply_error(&bot, msg.chat.id, e).await;
+                    }
                     deps.scheduler.wakeup();
                     bot.send_message(msg.chat.id, "Отменено.").await?;
                 }
@@ -299,7 +330,7 @@ async fn handle_command(
                     )
                     .await?;
                 }
-                Err(e) => return Err(into_anyhow(e)),
+                Err(e) => return reply_error(&bot, msg.chat.id, e).await,
             }
         }
         Command::Nudge(arg) => {
@@ -316,10 +347,12 @@ async fn handle_command(
                     return Ok(());
                 }
             };
-            deps.update_nudge_settings
+            if let Err(e) = deps.update_nudge_settings
                 .set_enabled(user.id, enabled)
                 .await
-                .map_err(into_anyhow)?;
+            {
+                return reply_error(&bot, msg.chat.id, e).await;
+            }
             let label = if enabled { "включены" } else { "выключены" };
             bot.send_message(
                 msg.chat.id,
@@ -368,15 +401,18 @@ async fn handle_command(
                 Err(dayhelper_application::AppError::Invalid(err_msg)) => {
                     bot.send_message(msg.chat.id, err_msg).await?;
                 }
-                Err(e) => return Err(into_anyhow(e)),
+                Err(e) => return reply_error(&bot, msg.chat.id, e).await,
             }
         }
         Command::Settings => {
-            let settings = deps
+            let settings = match deps
                 .update_nudge_settings
                 .get(user.id)
                 .await
-                .map_err(into_anyhow)?;
+            {
+                Ok(s) => s,
+                Err(e) => return reply_error(&bot, msg.chat.id, e).await,
+            };
             let tz_offset = chrono::Utc::now().with_timezone(&user.timezone).offset().fix();
             let offset_str = format!(
                 "{:+}{}",
@@ -401,6 +437,62 @@ async fn handle_command(
         }
     }
 
+    Ok(())
+}
+
+async fn handle_callback(
+    bot: Bot,
+    q: CallbackQuery,
+    deps: BotDeps,
+) -> anyhow::Result<()> {
+    let Some(data) = q.data else { return Ok(()) };
+    let Some(message) = q.message else { return Ok(()) };
+
+    if let Some(uuid_str) = data.strip_prefix("cancel:") {
+        match Uuid::parse_str(uuid_str) {
+            Ok(id) => {
+                // Resolve the user from the callback sender.
+                let tg_id = dayhelper_domain::TelegramUserId(q.from.id.0 as i64);
+                let user = match deps
+                    .ensure_user
+                    .execute(tg_id, deps.default_timezone)
+                    .await
+                {
+                    Ok(u) => u,
+                    Err(e) => return reply_error(&bot, message.chat().id, e).await,
+                };
+                let user = user.user();
+
+                // Ownership check: only cancel reminders belonging to this user.
+                let items = match deps.list_reminders.execute(user.id).await {
+                    Ok(items) => items,
+                    Err(e) => return reply_error(&bot, message.chat().id, e).await,
+                };
+                if !items.iter().any(|r| r.id.0 == id) {
+                    bot.answer_callback_query(&q.id).text("Не найдено").await?;
+                    return Ok(());
+                }
+
+                if let Err(e) = deps.cancel_reminder.execute(ReminderId(id)).await {
+                    return reply_error(&bot, message.chat().id, e).await;
+                }
+                deps.scheduler.wakeup();
+
+                bot.answer_callback_query(&q.id)
+                    .text("Отменено ✅")
+                    .await?;
+                bot.edit_message_text(
+                    message.chat().id,
+                    message.id(),
+                    "Напоминание отменено.",
+                )
+                .await?;
+            }
+            Err(_) => {
+                bot.answer_callback_query(&q.id).text("Ошибка").await?;
+            }
+        }
+    }
     Ok(())
 }
 
@@ -496,7 +588,21 @@ fn short_id(uuid: Uuid) -> String {
     uuid.to_string()[..8].to_string()
 }
 
-fn into_anyhow(e: dayhelper_application::AppError) -> anyhow::Error {
+/// Map an application error to a user-friendly Russian message.
+fn format_app_error(e: &dayhelper_application::AppError) -> String {
+    match e {
+        dayhelper_application::AppError::NotFound => "Не найдено.".to_string(),
+        dayhelper_application::AppError::Invalid(msg) => msg.clone(),
+        dayhelper_application::AppError::Storage(_) | dayhelper_application::AppError::Notify(_) => {
+            "⚠️ Произошла ошибка. Попробуйте позже.".to_string()
+        }
+    }
+}
+
+/// Log error and reply to the user with a friendly Russian message.
+/// Returns `Ok(())` so teloxide does not retry.
+async fn reply_error(bot: &Bot, chat_id: ChatId, e: dayhelper_application::AppError) -> anyhow::Result<()> {
     error!(error = %e, "app error");
-    anyhow::Error::msg(e.to_string())
+    let _ = bot.send_message(chat_id, format_app_error(&e)).await;
+    Ok(())
 }
