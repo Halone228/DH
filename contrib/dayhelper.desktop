@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=DayHelper
+Comment=Desktop activity tracker and notification daemon
+Exec=%h/.local/bin/dayhelper-cli daemon
+Terminal=false
+Hidden=false
+X-GNOME-Autostart-enabled=true

@@ -1,0 +1,13 @@
+[Unit]
+Description=DayHelper Desktop Daemon
+After=graphical-session.target
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/dayhelper-cli daemon
+Restart=on-failure
+RestartSec=5
+Environment=DAYHELPER_SERVER_URL=https://your-server.example.com
+
+[Install]
+WantedBy=default.target

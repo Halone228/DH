@@ -8,6 +8,7 @@ use std::time::Duration;
 use dayhelper_desktop_application::SessionAggregator;
 use dayhelper_desktop_domain::{FocusChange, IdleStatus};
 use dayhelper_desktop_ports::{IdleDetector, WindowTracker};
+use tokio::signal::unix::{signal, SignalKind};
 use tokio::sync::mpsc;
 use tokio::time::interval;
 use tracing::{error, info, warn};
@@ -35,6 +36,9 @@ pub async fn run(container: Arc<DesktopContainer>, opts: DaemonOptions) -> anyho
     let sync_task = spawn_sync(container.clone(), opts.sync_interval);
     let fire_task = spawn_fire(container.clone());
 
+    let mut sigterm =
+        signal(SignalKind::terminate()).expect("failed to install SIGTERM handler");
+
     info!("daemon up");
     tokio::select! {
         r = tracker_task => warn!(?r, "tracker exited"),
@@ -42,7 +46,11 @@ pub async fn run(container: Arc<DesktopContainer>, opts: DaemonOptions) -> anyho
         _ = consume_task => warn!("consumer exited"),
         _ = sync_task => warn!("sync exited"),
         _ = fire_task => warn!("fire exited"),
-        _ = tokio::signal::ctrl_c() => info!("ctrl-c"),
+        _ = tokio::signal::ctrl_c() => info!("received SIGINT, shutting down"),
+        sig = sigterm.recv() => {
+            let _ = sig; // consume the Option<()>
+            info!("received SIGTERM, shutting down");
+        }
     }
     Ok(())
 }
