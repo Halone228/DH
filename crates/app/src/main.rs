@@ -29,12 +29,16 @@ async fn main() -> Result<()> {
         .context("running migrations")?;
 
     let bot = Bot::new(&cfg.bot_token);
-    let container = Container::build(cfg, pool, bot.clone());
+    let container = Container::build(cfg, pool.clone(), bot.clone());
+
+    // Shutdown channel: broadcast to all long-lived tasks.
+    let (shutdown_tx, _) = tokio::sync::broadcast::channel::<()>(1);
 
     let scheduler = container.scheduler.clone();
     let scheduler_task = tokio::spawn({
         let scheduler = scheduler.clone();
-        async move { scheduler.run().await }
+        let shutdown_rx = shutdown_tx.subscribe();
+        async move { scheduler.run(shutdown_rx).await }
     });
 
     let bot_task = tokio::spawn({
@@ -77,6 +81,7 @@ async fn main() -> Result<()> {
             users: container.users.clone(),
         };
         let bind_addr = container.config.bind_addr;
+        let mut shutdown_rx = shutdown_tx.subscribe();
         async move {
             let tma_router = build_router(tma_state);
             let static_service = ServeDir::new("frontend/dist")
@@ -88,15 +93,51 @@ async fn main() -> Result<()> {
                 .await
                 .expect("bind http");
             info!(%bind_addr, "http listening (tma + desktop)");
-            axum::serve(listener, app).await.expect("axum serve");
+            let shutdown_signal = async {
+                let _ = shutdown_rx.recv().await;
+            };
+            axum::serve(listener, app)
+                .with_graceful_shutdown(shutdown_signal)
+                .await
+                .expect("axum serve");
         }
     });
 
+    // SQLite backup loop — only for file-backed databases.
+    let backup_task = {
+        let db_path = container.config.database_url
+            .trim_start_matches("sqlite://")
+            .to_string();
+        if db_path != ":memory:" && !db_path.is_empty() {
+            let backup = dayhelper_adapter_sqlite::backup::SqliteBackup::new(
+                pool,
+                db_path,
+                std::time::Duration::from_secs(3600),
+            );
+            let shutdown_rx = shutdown_tx.subscribe();
+            Some(tokio::spawn(async move { backup.run_loop(shutdown_rx).await }))
+        } else {
+            None
+        }
+    };
+
+    // Wait for ctrl-c, then signal all tasks to drain.
+    tokio::signal::ctrl_c().await?;
+    info!("shutting down...");
+    let _ = shutdown_tx.send(());
+
+    let drain_deadline = tokio::time::sleep(std::time::Duration::from_secs(10));
     tokio::select! {
-        _ = scheduler_task => info!("scheduler exited"),
-        _ = bot_task => info!("bot exited"),
-        _ = http_task => info!("http exited"),
-        _ = tokio::signal::ctrl_c() => info!("ctrl-c"),
+        _ = scheduler_task => { info!("scheduler drained"); }
+        _ = http_task => { info!("http drained"); }
+        _ = drain_deadline => { info!("shutdown timeout, forcing exit"); }
+    }
+
+    // Bot dispatcher has no clean shutdown API — just drop.
+    bot_task.abort();
+
+    if let Some(bt) = backup_task {
+        let _ = bt.await;
     }
 
     Ok(())

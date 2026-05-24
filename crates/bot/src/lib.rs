@@ -62,6 +62,13 @@ pub enum Command {
     Help,
 }
 
+/// Register bot commands with Telegram so users see autocomplete.
+pub async fn setup_commands(bot: &Bot) -> anyhow::Result<()> {
+    bot.set_my_commands(Command::bot_commands()).await?;
+    tracing::info!("bot commands registered");
+    Ok(())
+}
+
 /// Build the dispatcher. The caller spawns `dispatch().await`.
 pub fn build_dispatcher(bot: Bot, deps: BotDeps) -> Dispatcher<Bot, anyhow::Error, teloxide::dispatching::DefaultKey> {
     let handler = dptree::entry().branch(
