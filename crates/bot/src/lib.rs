@@ -5,6 +5,7 @@
 use std::sync::Arc;
 
 use chrono_tz::Tz;
+use chrono::TimeZone;
 use dayhelper_application::{
     CancelReminder, CreateReminder, CreateReminderCommand, EnsureUser, IssuePairCode,
     ListReminders,
@@ -106,7 +107,7 @@ async fn handle_command(
             bot.send_message(msg.chat.id, text).await?;
         }
         Command::Once(args) => {
-            match parse_once(&args) {
+            match parse_once(&args, user.timezone) {
                 Ok((at_utc, text)) => {
                     let r = deps
                         .create_reminder
@@ -191,17 +192,29 @@ async fn handle_command(
     Ok(())
 }
 
-fn parse_once(args: &str) -> Result<(chrono::DateTime<chrono::Utc>, String), String> {
+fn parse_once(args: &str, tz: Tz) -> Result<(chrono::DateTime<chrono::Utc>, String), String> {
     let mut parts = args.splitn(2, char::is_whitespace);
     let datetime = parts.next().ok_or("нет даты")?.trim();
     let text = parts.next().ok_or("нет текста")?.trim().to_string();
     if text.is_empty() {
         return Err("пустой текст".into());
     }
-    // Accept naive ISO `YYYY-MM-DDTHH:MM`; assume UTC. Upgrade later to user-tz.
     let naive = chrono::NaiveDateTime::parse_from_str(datetime, "%Y-%m-%dT%H:%M")
         .map_err(|e| e.to_string())?;
-    Ok((chrono::DateTime::from_naive_utc_and_offset(naive, chrono::Utc), text))
+    // Interpret naive datetime in the user's local timezone, mirroring the
+    // combine() DST pattern from domain::recurrence.
+    let aware = match tz.from_local_datetime(&naive) {
+        chrono::LocalResult::Single(dt) => dt,
+        chrono::LocalResult::Ambiguous(dt, _) => dt, // earliest, same as combine()
+        chrono::LocalResult::None => {
+            // DST gap: bump forward by 1 minute and retry
+            let bumped = naive + chrono::Duration::minutes(1);
+            tz.from_local_datetime(&bumped)
+                .single()
+                .ok_or("не удалось разрешить время (переход DST)".to_string())?
+        }
+    };
+    Ok((aware.with_timezone(&chrono::Utc), text))
 }
 
 fn parse_daily(args: &str) -> Result<(chrono::NaiveTime, String), String> {
