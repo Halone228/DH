@@ -7,6 +7,11 @@ use dayhelper_ports::{
 };
 use tracing::{error, warn};
 
+/// Nudges older than this are skipped rather than fired late. This prevents
+/// a 4 AM nudge from popping up when the server comes back up at 9 AM.
+/// Reminders are NOT affected — they fire late by design.
+const NUDGE_STALE_THRESHOLD: chrono::Duration = chrono::Duration::minutes(30);
+
 use crate::AppError;
 
 /// One step of the scheduler loop. The runtime crate calls this in a tight
@@ -56,6 +61,15 @@ impl FireDueJobs {
 
         match &job.kind {
             JobKind::Nudge { message } => {
+                let age = self.clock.now() - job.fire_at;
+                if age > NUDGE_STALE_THRESHOLD {
+                    warn!(
+                        job = %job.id.0,
+                        age_secs = age.num_seconds(),
+                        "skipping stale nudge"
+                    );
+                    return Ok(());
+                }
                 self.notifier.notify(user.telegram_id, message).await?;
             }
             JobKind::Reminder { reminder_id } => {
