@@ -16,6 +16,7 @@ use axum::{
     extract::FromRequestParts,
     http::{request::Parts, StatusCode},
 };
+use chrono::{TimeZone, Utc};
 use dayhelper_domain::{TelegramUserId, User};
 use hmac::{Hmac, Mac};
 use serde::Deserialize;
@@ -69,6 +70,30 @@ pub fn verify(init_data: &str, bot_token: &str) -> Result<TelegramUserId, InitDa
             status: StatusCode::UNAUTHORIZED,
             message: "bad signature",
         });
+    }
+
+    // Reject stale initData (> 24 h old).
+    if let Some(auth_date_str) = pairs.get("auth_date") {
+        let auth_date_ts: i64 = auth_date_str
+            .parse()
+            .map_err(|_| InitDataError {
+                status: StatusCode::BAD_REQUEST,
+                message: "invalid auth_date",
+            })?;
+        let auth_date = Utc
+            .timestamp_opt(auth_date_ts, 0)
+            .single()
+            .ok_or(InitDataError {
+                status: StatusCode::BAD_REQUEST,
+                message: "invalid auth_date timestamp",
+            })?;
+        let age = Utc::now() - auth_date;
+        if age.num_hours() > 24 {
+            return Err(InitDataError {
+                status: StatusCode::UNAUTHORIZED,
+                message: "initData expired",
+            });
+        }
     }
 
     let user_blob = pairs.get("user").ok_or(InitDataError {

@@ -8,6 +8,7 @@ use dayhelper_server_desktop_api::{
 };
 use dayhelper_tma::{build_router, TmaState};
 use teloxide::Bot;
+use tower_http::services::{ServeDir, ServeFile};
 use tracing::info;
 use tracing_subscriber::EnvFilter;
 
@@ -64,6 +65,9 @@ async fn main() -> Result<()> {
             create_reminder: container.create_reminder.clone(),
             list_reminders: container.list_reminders.clone(),
             cancel_reminder: container.cancel_reminder.clone(),
+            update_timezone: container.update_timezone.clone(),
+            update_nudge_settings: container.update_nudge_settings.clone(),
+            reminder_repo: container.reminders.clone(),
             scheduler: container.scheduler.handle(),
         };
         let desktop_state = ServerDesktopState {
@@ -74,7 +78,12 @@ async fn main() -> Result<()> {
         };
         let bind_addr = container.config.bind_addr;
         async move {
-            let app = build_router(tma_state).merge(build_desktop_router(desktop_state));
+            let tma_router = build_router(tma_state);
+            let static_service = ServeDir::new("frontend/dist")
+                .fallback(ServeFile::new("frontend/dist/index.html"));
+            let app = tma_router
+                .merge(build_desktop_router(desktop_state))
+                .fallback_service(static_service);
             let listener = tokio::net::TcpListener::bind(bind_addr)
                 .await
                 .expect("bind http");

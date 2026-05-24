@@ -51,4 +51,16 @@ impl UpdateNudgeSettings {
         self.nudge_settings.save(&settings).await?;
         Ok(())
     }
+
+    /// Update the daily nudge count.
+    pub async fn set_daily_count(
+        &self,
+        user_id: UserId,
+        count: u8,
+    ) -> Result<(), AppError> {
+        let mut settings = self.get(user_id).await?;
+        settings.daily_count = count;
+        self.nudge_settings.save(&settings).await?;
+        Ok(())
+    }
 }

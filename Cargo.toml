@@ -72,7 +72,7 @@ teloxide = { version = "0.13", default-features = false, features = ["macros", "
 
 # HTTP / TMA
 axum = { version = "0.7", features = ["macros"] }
-tower-http = { version = "0.5", features = ["cors", "trace"] }
+tower-http = { version = "0.5", features = ["cors", "trace", "fs"] }
 
 # initData verification
 hmac = "0.12"
