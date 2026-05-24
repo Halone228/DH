@@ -5,10 +5,10 @@
 use std::sync::Arc;
 
 use chrono_tz::Tz;
-use chrono::TimeZone;
+use chrono::{Offset, TimeZone};
 use dayhelper_application::{
     CancelReminder, CreateReminder, CreateReminderCommand, EnsureUser, IssuePairCode,
-    ListReminders,
+    ListReminders, UpdateNudgeSettings, UpdateTimezone,
 };
 use dayhelper_domain::{Recurrence, ReminderId, Weekday};
 use dayhelper_scheduler::SchedulerHandle;
@@ -24,6 +24,8 @@ pub struct BotDeps {
     pub list_reminders: Arc<ListReminders>,
     pub cancel_reminder: Arc<CancelReminder>,
     pub issue_pair_code: Arc<IssuePairCode>,
+    pub update_timezone: Arc<UpdateTimezone>,
+    pub update_nudge_settings: Arc<UpdateNudgeSettings>,
     pub scheduler: SchedulerHandle,
     pub default_timezone: Tz,
     pub tma_url: String,
@@ -48,6 +50,14 @@ pub enum Command {
     Cancel(String),
     #[command(description = "получить код для подключения desktop-клиента")]
     Pair,
+    #[command(description = "изменить часовой пояс: /timezone Europe/Moscow")]
+    Timezone(String),
+    #[command(description = "включить/выключить нуджи: /nudge on или /nudge off")]
+    Nudge(String),
+    #[command(description = "окно нуджей: /nudge_window 09:00 21:00")]
+    NudgeWindow(String),
+    #[command(description = "показать текущие настройки")]
+    Settings,
     #[command(description = "помощь")]
     Help,
 }
@@ -247,6 +257,131 @@ async fn handle_command(
                         .await?;
                 }
             }
+        }
+        Command::Timezone(arg) => {
+            let tz_str = arg.trim();
+            if tz_str.is_empty() {
+                bot.send_message(
+                    msg.chat.id,
+                    "Укажите часовой пояс.\nПример: /timezone Europe/Moscow",
+                )
+                .await?;
+                return Ok(());
+            }
+            match deps.update_timezone.execute(user.id, tz_str).await {
+                Ok(()) => {
+                    bot.send_message(
+                        msg.chat.id,
+                        format!("Часовой пояс обновлён: {tz_str}"),
+                    )
+                    .await?;
+                }
+                Err(dayhelper_application::AppError::Invalid(_)) => {
+                    bot.send_message(
+                        msg.chat.id,
+                        format!("Неверный часовой пояс: {tz_str}\nПример: /timezone Europe/Moscow"),
+                    )
+                    .await?;
+                }
+                Err(e) => return Err(into_anyhow(e)),
+            }
+        }
+        Command::Nudge(arg) => {
+            let val = arg.trim().to_lowercase();
+            let enabled = match val.as_str() {
+                "on" | "вкл" | "1" => true,
+                "off" | "выкл" | "0" => false,
+                _ => {
+                    bot.send_message(
+                        msg.chat.id,
+                        "Укажите on или off.\nПример: /nudge on",
+                    )
+                    .await?;
+                    return Ok(());
+                }
+            };
+            deps.update_nudge_settings
+                .set_enabled(user.id, enabled)
+                .await
+                .map_err(into_anyhow)?;
+            let label = if enabled { "включены" } else { "выключены" };
+            bot.send_message(
+                msg.chat.id,
+                format!("Анти-прокрастинация {label}."),
+            )
+            .await?;
+        }
+        Command::NudgeWindow(arg) => {
+            let mut parts = arg.trim().splitn(2, char::is_whitespace);
+            let start_str = parts.next().unwrap_or("");
+            let end_str = parts.next().unwrap_or("");
+            let start = match chrono::NaiveTime::parse_from_str(start_str, "%H:%M") {
+                Ok(t) => t,
+                Err(_) => {
+                    bot.send_message(
+                        msg.chat.id,
+                        "Неверный формат времени.\nПример: /nudge_window 09:00 21:00",
+                    )
+                    .await?;
+                    return Ok(());
+                }
+            };
+            let end = match chrono::NaiveTime::parse_from_str(end_str, "%H:%M") {
+                Ok(t) => t,
+                Err(_) => {
+                    bot.send_message(
+                        msg.chat.id,
+                        "Неверный формат времени.\nПример: /nudge_window 09:00 21:00",
+                    )
+                    .await?;
+                    return Ok(());
+                }
+            };
+            match deps.update_nudge_settings.set_window(user.id, start, end).await {
+                Ok(()) => {
+                    bot.send_message(
+                        msg.chat.id,
+                        format!(
+                            "Окно обновлено: {} — {}",
+                            start.format("%H:%M"),
+                            end.format("%H:%M")
+                        ),
+                    )
+                    .await?;
+                }
+                Err(dayhelper_application::AppError::Invalid(err_msg)) => {
+                    bot.send_message(msg.chat.id, err_msg).await?;
+                }
+                Err(e) => return Err(into_anyhow(e)),
+            }
+        }
+        Command::Settings => {
+            let settings = deps
+                .update_nudge_settings
+                .get(user.id)
+                .await
+                .map_err(into_anyhow)?;
+            let tz_offset = chrono::Utc::now().with_timezone(&user.timezone).offset().fix();
+            let offset_str = format!(
+                "{:+}{}",
+                tz_offset.local_minus_utc() / 3600,
+                if tz_offset.local_minus_utc() % 3600 != 0 {
+                    format!(":{:02}", (tz_offset.local_minus_utc() % 3600).abs() / 60)
+                } else {
+                    String::new()
+                }
+            );
+            let enabled_label = if settings.enabled { "включена" } else { "выключена" };
+            let text = format!
+                ("││͟ Настройки\n\nЧасовой пояс: {} (UTC{})\nАнти-прокрастинация: {}\nКоличество в день: {}\nАктивное окно: {} — {}",
+                user.timezone.name(),
+                offset_str,
+                enabled_label,
+                settings.daily_count,
+                settings.active_window_start.format("%H:%M"),
+                settings.active_window_end.format("%H:%M"),
+            );
+            bot.send_message(msg.chat.id, text).await?;
         }
     }
 

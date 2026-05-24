@@ -43,6 +43,8 @@ async fn main() -> Result<()> {
             list_reminders: container.list_reminders.clone(),
             cancel_reminder: container.cancel_reminder.clone(),
             issue_pair_code: container.issue_pair_code.clone(),
+            update_timezone: container.update_timezone.clone(),
+            update_nudge_settings: container.update_nudge_settings.clone(),
             scheduler: container.scheduler.handle(),
             default_timezone: container.config.default_timezone,
             tma_url: container.config.tma_public_url.clone(),

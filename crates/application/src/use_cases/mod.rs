@@ -8,3 +8,5 @@ pub mod list_reminders;
 pub mod prune_old_data;
 pub mod redeem_pair_code;
 pub mod schedule_nudges;
+pub mod update_nudge_settings;
+pub mod update_timezone;

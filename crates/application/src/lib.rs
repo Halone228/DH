@@ -23,6 +23,8 @@ pub use use_cases::list_reminders::ListReminders;
 pub use use_cases::prune_old_data::{PruneOldData, PruneRetention, PruneSummary};
 pub use use_cases::redeem_pair_code::{RedeemPairCode, RedeemPairCodeOutcome};
 pub use use_cases::schedule_nudges::ScheduleDailyNudges;
+pub use use_cases::update_nudge_settings::UpdateNudgeSettings;
+pub use use_cases::update_timezone::UpdateTimezone;
 
 pub mod auth {
     //! Re-exports for the bearer-auth path used by `server-desktop-api`.
