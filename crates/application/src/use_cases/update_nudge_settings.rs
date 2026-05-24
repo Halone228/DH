@@ -64,3 +64,58 @@ impl UpdateNudgeSettings {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test_utils::FakeNudgeSettingsRepo;
+    use chrono::NaiveTime;
+    use dayhelper_domain::ids::UserId;
+
+    fn make_uc() -> (Arc<FakeNudgeSettingsRepo>, UpdateNudgeSettings) {
+        let repo = Arc::new(FakeNudgeSettingsRepo::new());
+        let uc = UpdateNudgeSettings::new(repo.clone());
+        (repo, uc)
+    }
+
+    #[tokio::test]
+    async fn test_set_enabled() {
+        let (_, uc) = make_uc();
+        let uid = UserId::new();
+        uc.set_enabled(uid, true).await.unwrap();
+        let settings = uc.get(uid).await.unwrap();
+        assert!(settings.enabled);
+    }
+
+    #[tokio::test]
+    async fn test_set_window() {
+        let (_, uc) = make_uc();
+        let uid = UserId::new();
+        let start = NaiveTime::from_hms_opt(8, 0, 0).unwrap();
+        let end = NaiveTime::from_hms_opt(22, 0, 0).unwrap();
+        uc.set_window(uid, start, end).await.unwrap();
+        let settings = uc.get(uid).await.unwrap();
+        assert_eq!(settings.active_window_start, start);
+        assert_eq!(settings.active_window_end, end);
+    }
+
+    #[tokio::test]
+    async fn test_set_daily_count() {
+        let (_, uc) = make_uc();
+        let uid = UserId::new();
+        uc.set_daily_count(uid, 10).await.unwrap();
+        let settings = uc.get(uid).await.unwrap();
+        assert_eq!(settings.daily_count, 10);
+    }
+
+    #[tokio::test]
+    async fn test_invalid_window_start_after_end() {
+        let (_, uc) = make_uc();
+        let uid = UserId::new();
+        let start = NaiveTime::from_hms_opt(22, 0, 0).unwrap();
+        let end = NaiveTime::from_hms_opt(8, 0, 0).unwrap();
+        let result = uc.set_window(uid, start, end).await;
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), crate::AppError::Invalid(_)));
+    }
+}

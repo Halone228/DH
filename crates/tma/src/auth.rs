@@ -186,3 +186,107 @@ fn extract_init_data(parts: &Parts) -> Option<String> {
         .and_then(|v| v.to_str().ok())
         .map(|s| s.to_string())
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// Helper: craft valid initData for a given bot token and fields.
+    fn craft_init_data(bot_token: &str, user_id: i64, auth_date: i64) -> String {
+        let user_json = format!("{{\"id\":{user_id}}}");
+        let user_encoded = url::form_urlencoded::byte_serialize(user_json.as_bytes())
+            .collect::<String>();
+
+        // Build the data_check_string using DECODED values (sorted by key, without hash)
+        // This is what verify() will compute after URL-decoding the query string.
+        let data_check_string = format!(
+            "auth_date={auth_date}\nquery_id=AAHdF5eI\nuser={user_json}"
+        );
+
+        // HMAC-SHA256("WebAppData", bot_token) → secret_key
+        let mut mac = HmacSha256::new_from_slice(b"WebAppData").unwrap();
+        mac.update(bot_token.as_bytes());
+        let secret_key = mac.finalize().into_bytes();
+
+        // HMAC-SHA256(secret_key, data_check_string) → hash
+        let mut mac2 = HmacSha256::new_from_slice(&secret_key).unwrap();
+        mac2.update(data_check_string.as_bytes());
+        let hash = hex::encode(mac2.finalize().into_bytes());
+
+        // Re-build the init_data string as URL-encoded query string
+        format!(
+            "auth_date={auth_date}&query_id=AAHdF5eI&user={user_encoded}&hash={hash}"
+        )
+    }
+
+    #[test]
+    fn test_verify_valid_init_data() {
+        let bot_token = "test_bot_token_123";
+        let now_ts = Utc::now().timestamp();
+        let init_data = craft_init_data(bot_token, 42, now_ts);
+        let result = verify(&init_data, bot_token);
+        assert!(result.is_ok());
+        assert_eq!(result.unwrap().0, 42);
+    }
+
+    #[test]
+    fn test_verify_missing_hash() {
+        let init_data = "auth_date=1234567890&user=%7B%22id%22%3A42%7D";
+        let result = verify(init_data, "any_token");
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err().message, "missing hash");
+    }
+
+    #[test]
+    fn test_verify_bad_signature() {
+        let bot_token = "test_bot_token_123";
+        let now_ts = Utc::now().timestamp();
+        let init_data = craft_init_data(bot_token, 42, now_ts);
+        // Tamper with hash
+        let tampered = init_data.replace("hash=", "hash=deadbeef");
+        let result = verify(&tampered, bot_token);
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err().message, "bad signature");
+    }
+
+    #[test]
+    fn test_verify_expired_auth_date() {
+        let bot_token = "test_bot_token_123";
+        // 25 hours ago
+        let old_ts = Utc::now().timestamp() - 25 * 3600;
+        let init_data = craft_init_data(bot_token, 42, old_ts);
+        let result = verify(&init_data, bot_token);
+        assert!(result.is_err());
+        assert_eq!(result.unwrap_err().message, "initData expired");
+    }
+
+    #[test]
+    fn test_parse_init_data_basic() {
+        let data = "hash=abc123&user=%7B%22id%22%3A42%7D&auth_date=1700000000";
+        let pairs = parse_init_data(data).unwrap();
+        assert_eq!(pairs.get("hash").unwrap(), "abc123");
+        assert_eq!(pairs.get("user").unwrap(), "{\"id\":42}");
+        assert_eq!(pairs.get("auth_date").unwrap(), "1700000000");
+    }
+
+    #[test]
+    fn test_parse_init_data_empty() {
+        let result = parse_init_data("");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_constant_time_eq_same() {
+        assert!(constant_time_eq(b"abc", b"abc"));
+    }
+
+    #[test]
+    fn test_constant_time_eq_different() {
+        assert!(!constant_time_eq(b"abc", b"abd"));
+    }
+
+    #[test]
+    fn test_constant_time_eq_different_lengths() {
+        assert!(!constant_time_eq(b"abc", b"abcd"));
+    }
+}

@@ -6,6 +6,41 @@ use dayhelper_ports::UserRepo;
 
 use crate::AppError;
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test_utils::FakeUserRepo;
+    use chrono_tz::Europe::Moscow;
+
+    #[tokio::test]
+    async fn test_new_user_creates_and_returns_new() {
+        let repo = Arc::new(FakeUserRepo::new());
+        let uc = EnsureUser::new(repo.clone());
+        let tg_id = TelegramUserId(42);
+        let result = uc.execute(tg_id, Moscow).await.unwrap();
+        assert!(matches!(result, EnsureResult::New(_)));
+        assert_eq!(result.user().telegram_id, tg_id);
+    }
+
+    #[tokio::test]
+    async fn test_existing_user_returns_existing() {
+        let repo = Arc::new(FakeUserRepo::new());
+        let uc = EnsureUser::new(repo.clone());
+        let tg_id = TelegramUserId(42);
+        uc.execute(tg_id, Moscow).await.unwrap();
+        let result = uc.execute(tg_id, Moscow).await.unwrap();
+        assert!(matches!(result, EnsureResult::Existing(_)));
+    }
+
+    #[tokio::test]
+    async fn test_new_user_has_default_timezone() {
+        let repo = Arc::new(FakeUserRepo::new());
+        let uc = EnsureUser::new(repo.clone());
+        let result = uc.execute(TelegramUserId(1), Moscow).await.unwrap();
+        assert_eq!(result.user().timezone, Moscow);
+    }
+}
+
 /// Result of [`EnsureUser::execute`] — distinguishes first-time users from
 /// returning ones so callers can tailor onboarding messages.
 #[derive(Debug)]

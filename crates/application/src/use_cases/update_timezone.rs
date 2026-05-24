@@ -31,3 +31,44 @@ impl UpdateTimezone {
         Ok(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test_utils::FakeUserRepo;
+    use chrono_tz::Europe::Moscow;
+    use dayhelper_domain::TelegramUserId;
+
+    #[tokio::test]
+    async fn test_valid_timezone_updates() {
+        let repo = Arc::new(FakeUserRepo::new());
+        let uc = UpdateTimezone::new(repo.clone());
+
+        let tg = TelegramUserId(1);
+        let user = dayhelper_domain::User::new(tg, Moscow);
+        let uid = user.id;
+        repo.upsert(&user).await.unwrap();
+
+        uc.execute(uid, "Asia/Yekaterinburg").await.unwrap();
+        let updated = repo.find_by_id(uid).await.unwrap().unwrap();
+        assert_eq!(
+            updated.timezone.name(),
+            "Asia/Yekaterinburg"
+        );
+    }
+
+    #[tokio::test]
+    async fn test_invalid_timezone_fails() {
+        let repo = Arc::new(FakeUserRepo::new());
+        let uc = UpdateTimezone::new(repo.clone());
+
+        let tg = TelegramUserId(1);
+        let user = dayhelper_domain::User::new(tg, Moscow);
+        let uid = user.id;
+        repo.upsert(&user).await.unwrap();
+
+        let result = uc.execute(uid, "Invalid/Zone").await;
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), crate::AppError::Invalid(_)));
+    }
+}

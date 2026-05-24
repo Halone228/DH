@@ -496,7 +496,7 @@ async fn handle_callback(
     Ok(())
 }
 
-fn parse_once(args: &str, tz: Tz) -> Result<(chrono::DateTime<chrono::Utc>, String), String> {
+pub(crate) fn parse_once(args: &str, tz: Tz) -> Result<(chrono::DateTime<chrono::Utc>, String), String> {
     let mut parts = args.splitn(2, char::is_whitespace);
     let datetime = parts.next().ok_or("нет даты")?.trim();
     let text = parts.next().ok_or("нет текста")?.trim().to_string();
@@ -521,7 +521,7 @@ fn parse_once(args: &str, tz: Tz) -> Result<(chrono::DateTime<chrono::Utc>, Stri
     Ok((aware.with_timezone(&chrono::Utc), text))
 }
 
-fn parse_daily(args: &str) -> Result<(chrono::NaiveTime, String), String> {
+pub(crate) fn parse_daily(args: &str) -> Result<(chrono::NaiveTime, String), String> {
     let mut parts = args.splitn(2, char::is_whitespace);
     let time = parts.next().ok_or("нет времени")?.trim();
     let text = parts.next().ok_or("нет текста")?.trim().to_string();
@@ -532,7 +532,7 @@ fn parse_daily(args: &str) -> Result<(chrono::NaiveTime, String), String> {
     Ok((t, text))
 }
 
-fn parse_weekly(args: &str) -> Result<(Vec<Weekday>, chrono::NaiveTime, String), String> {
+pub(crate) fn parse_weekly(args: &str) -> Result<(Vec<Weekday>, chrono::NaiveTime, String), String> {
     let mut parts = args.splitn(3, char::is_whitespace);
     let weekdays_str = parts.next().ok_or("нет дней недели")?.trim();
     let time_str = parts.next().ok_or("нет времени")?.trim();
@@ -552,7 +552,7 @@ fn parse_weekly(args: &str) -> Result<(Vec<Weekday>, chrono::NaiveTime, String),
     Ok((weekdays, time, text))
 }
 
-fn parse_monthly(args: &str) -> Result<(u8, chrono::NaiveTime, String), String> {
+pub(crate) fn parse_monthly(args: &str) -> Result<(u8, chrono::NaiveTime, String), String> {
     let mut parts = args.splitn(3, char::is_whitespace);
     let day_str = parts.next().ok_or("нет дня месяца")?.trim();
     let time_str = parts.next().ok_or("нет времени")?.trim();
@@ -571,7 +571,7 @@ fn parse_monthly(args: &str) -> Result<(u8, chrono::NaiveTime, String), String> 
     Ok((day, time, text))
 }
 
-fn parse_weekday(s: &str) -> Option<Weekday> {
+pub(crate) fn parse_weekday(s: &str) -> Option<Weekday> {
     match s.to_lowercase().as_str() {
         "mon" | "пн" => Some(Weekday::Mon),
         "tue" | "вт" => Some(Weekday::Tue),
@@ -605,4 +605,81 @@ async fn reply_error(bot: &Bot, chat_id: ChatId, e: dayhelper_application::AppEr
     error!(error = %e, "app error");
     let _ = bot.send_message(chat_id, format_app_error(&e)).await;
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use chrono_tz::Europe::Moscow;
+    use chrono::{Timelike, Datelike};
+
+    #[test]
+    fn test_parse_once_valid() {
+        let (dt, text) = parse_once("2026-06-15T10:00 hello world", Moscow).unwrap();
+        let local = dt.with_timezone(&Moscow);
+        assert_eq!(local.hour(), 10);
+        assert_eq!(local.day(), 15);
+        assert_eq!(text, "hello world");
+    }
+
+    #[test]
+    fn test_parse_daily_valid() {
+        let (time, text) = parse_daily("09:00 зарядка").unwrap();
+        assert_eq!(time.hour(), 9);
+        assert_eq!(text, "зарядка");
+    }
+
+    #[test]
+    fn test_parse_weekly_en() {
+        let (weekdays, time, text) = parse_weekly("Mon,Wed,Fri 09:00 gym").unwrap();
+        assert_eq!(weekdays, vec![Weekday::Mon, Weekday::Wed, Weekday::Fri]);
+        assert_eq!(time.hour(), 9);
+        assert_eq!(text, "gym");
+    }
+
+    #[test]
+    fn test_parse_weekly_ru() {
+        let (weekdays, _, _) = parse_weekly("пн,ср,пт 09:00 зарядка").unwrap();
+        assert_eq!(weekdays, vec![Weekday::Mon, Weekday::Wed, Weekday::Fri]);
+    }
+
+    #[test]
+    fn test_parse_monthly_valid() {
+        let (day, time, text) = parse_monthly("15 09:30 оплатить счёт").unwrap();
+        assert_eq!(day, 15);
+        assert_eq!(time.hour(), 9);
+        assert_eq!(text, "оплатить счёт");
+    }
+
+    #[test]
+    fn test_parse_monthly_invalid_day() {
+        let result = parse_monthly("32 09:00 test");
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_weekday_en() {
+        assert_eq!(parse_weekday("Mon"), Some(Weekday::Mon));
+        assert_eq!(parse_weekday("Tue"), Some(Weekday::Tue));
+        assert_eq!(parse_weekday("Sun"), Some(Weekday::Sun));
+    }
+
+    #[test]
+    fn test_parse_weekday_ru() {
+        assert_eq!(parse_weekday("пн"), Some(Weekday::Mon));
+        assert_eq!(parse_weekday("ср"), Some(Weekday::Wed));
+        assert_eq!(parse_weekday("вс"), Some(Weekday::Sun));
+    }
+
+    #[test]
+    fn test_parse_once_missing_text() {
+        let result = parse_once("2026-06-15T10:00", Moscow);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn test_parse_daily_invalid_time() {
+        let result = parse_daily("25:00 test");
+        assert!(result.is_err());
+    }
 }

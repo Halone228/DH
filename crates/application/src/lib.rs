@@ -30,3 +30,6 @@ pub mod auth {
     //! Re-exports for the bearer-auth path used by `server-desktop-api`.
     pub use crate::use_cases::redeem_pair_code::sha256_hex;
 }
+
+#[cfg(test)]
+pub mod test_utils;

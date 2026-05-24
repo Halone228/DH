@@ -126,3 +126,70 @@ fn tomorrows_window_utc(
 fn rand_seed(at: DateTime<Utc>) -> u64 {
     at.timestamp_nanos_opt().unwrap_or(0) as u64
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::test_utils::{FakeClock, FakeJobQueue, FakeRandomSource};
+    use chrono::{TimeZone, Utc};
+    use chrono_tz::Europe::Moscow;
+    use dayhelper_domain::NudgeSettings;
+
+    fn fixed_now() -> DateTime<Utc> {
+        // 10:00 Moscow time — well within the default window
+        Moscow
+            .with_ymd_and_hms(2026, 5, 24, 10, 0, 0)
+            .unwrap()
+            .with_timezone(&Utc)
+    }
+
+    fn default_settings(uid: UserId) -> NudgeSettings {
+        NudgeSettings::default_for(uid)
+    }
+
+    #[tokio::test]
+    async fn test_schedules_nudges_for_enabled_user() {
+        let clock = Arc::new(FakeClock::new(fixed_now()));
+        let jobs = Arc::new(FakeJobQueue::new());
+        let rng = Arc::new(FakeRandomSource);
+        let uc = ScheduleDailyNudges::new(jobs.clone(), clock, rng);
+
+        let uid = UserId::new();
+        let settings = default_settings(uid);
+        uc.execute(uid, Moscow, &settings).await.unwrap();
+
+        assert_eq!(jobs.len().await, 5);
+    }
+
+    #[tokio::test]
+    async fn test_skips_disabled_user() {
+        let clock = Arc::new(FakeClock::new(fixed_now()));
+        let jobs = Arc::new(FakeJobQueue::new());
+        let rng = Arc::new(FakeRandomSource);
+        let uc = ScheduleDailyNudges::new(jobs.clone(), clock, rng);
+
+        let uid = UserId::new();
+        let mut settings = default_settings(uid);
+        settings.enabled = false;
+        uc.execute(uid, Moscow, &settings).await.unwrap();
+
+        assert_eq!(jobs.len().await, 0);
+    }
+
+    #[tokio::test]
+    async fn test_idempotent_no_duplicate_nudges() {
+        let clock = Arc::new(FakeClock::new(fixed_now()));
+        let jobs = Arc::new(FakeJobQueue::new());
+        let rng = Arc::new(FakeRandomSource);
+        let uc = ScheduleDailyNudges::new(jobs.clone(), clock.clone(), rng);
+
+        let uid = UserId::new();
+        let settings = default_settings(uid);
+        uc.execute(uid, Moscow, &settings).await.unwrap();
+        assert_eq!(jobs.len().await, 5);
+
+        // Second call should be a no-op
+        uc.execute(uid, Moscow, &settings).await.unwrap();
+        assert_eq!(jobs.len().await, 5, "should not double-schedule");
+    }
+}
