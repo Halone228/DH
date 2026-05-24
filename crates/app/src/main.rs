@@ -7,6 +7,7 @@ use dayhelper_server_desktop_api::{
     build_router as build_desktop_router, ServerDesktopState,
 };
 use dayhelper_tma::{build_router, TmaState};
+use std::sync::Arc;
 use teloxide::Bot;
 use tower_http::services::{ServeDir, ServeFile};
 use tracing::info;
@@ -73,6 +74,10 @@ async fn main() -> Result<()> {
             update_nudge_settings: container.update_nudge_settings.clone(),
             reminder_repo: container.reminders.clone(),
             scheduler: container.scheduler.handle(),
+            rate_limiter: Arc::new(dayhelper_tma::rate_limit::RateLimiter::new(
+                30,
+                std::time::Duration::from_secs(60),
+            )),
         };
         let desktop_state = ServerDesktopState {
             redeem_pair_code: container.redeem_pair_code.clone(),
@@ -145,5 +150,15 @@ async fn main() -> Result<()> {
 
 fn init_tracing() {
     let filter = EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new("info"));
-    tracing_subscriber::fmt().with_env_filter(filter).init();
+    let format = std::env::var("RUST_LOG_FORMAT").unwrap_or_default();
+    if format == "json" {
+        tracing_subscriber::fmt()
+            .with_env_filter(filter)
+            .json()
+            .with_target(true)
+            .with_span_list(true)
+            .init();
+    } else {
+        tracing_subscriber::fmt().with_env_filter(filter).init();
+    }
 }

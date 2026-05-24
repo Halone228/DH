@@ -3,6 +3,7 @@
 //! the HMAC and inflates the requesting user.
 
 pub mod auth;
+pub mod rate_limit;
 pub mod router;
 pub mod state;
 

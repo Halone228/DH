@@ -8,6 +8,8 @@ use dayhelper_application::{
 use dayhelper_ports::ReminderRepo;
 use dayhelper_scheduler::SchedulerHandle;
 
+use crate::rate_limit::RateLimiter;
+
 #[derive(Clone)]
 pub struct TmaState {
     pub bot_token: Arc<str>,
@@ -20,4 +22,5 @@ pub struct TmaState {
     pub update_nudge_settings: Arc<UpdateNudgeSettings>,
     pub reminder_repo: Arc<dyn ReminderRepo>,
     pub scheduler: SchedulerHandle,
+    pub rate_limiter: Arc<RateLimiter>,
 }

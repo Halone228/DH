@@ -15,6 +15,22 @@ use uuid::Uuid;
 use crate::auth::AuthedUser;
 use crate::state::TmaState;
 
+/// Check rate limit for an authenticated user. Returns `Err` with 429 if
+/// the limit is exceeded.
+macro_rules! rate_limit {
+    ($state:expr, $user:expr) => {
+        if !$state
+            .rate_limiter
+            .check($user.telegram_id.0)
+            .await
+        {
+            return Err(ApiError(AppError::Invalid(
+                "Слишком много запросов. Попробуйте позже.".into(),
+            )));
+        }
+    };
+}
+
 pub fn build_router(state: TmaState) -> Router {
     Router::new()
         .route("/api/health", get(health))
@@ -60,6 +76,7 @@ async fn update_me(
     AuthedUser { user, is_new: _ }: AuthedUser,
     Json(body): Json<UpdateMeRequest>,
 ) -> Result<Json<MeResponse>, ApiError> {
+    rate_limit!(state, user);
     if let Some(ref tz) = body.timezone {
         state.update_timezone.execute(user.id, tz).await?;
     }
@@ -140,6 +157,7 @@ async fn create_reminder(
     AuthedUser { user, is_new: _ }: AuthedUser,
     Json(req): Json<CreateReminderRequest>,
 ) -> Result<Json<ReminderDto>, ApiError> {
+    rate_limit!(state, user);
     let r = state
         .create_reminder
         .execute(CreateReminderCommand {
@@ -164,6 +182,7 @@ async fn cancel_reminder(
     AuthedUser { user, is_new: _ }: AuthedUser,
     Path(id): Path<Uuid>,
 ) -> Result<StatusCode, ApiError> {
+    rate_limit!(state, user);
     // Ownership check: verify the reminder belongs to the authenticated user.
     let reminder = state
         .reminder_repo
@@ -221,6 +240,7 @@ async fn update_nudge_settings(
     AuthedUser { user, is_new: _ }: AuthedUser,
     Json(body): Json<UpdateNudgeSettingsRequest>,
 ) -> Result<Json<NudgeSettingsDto>, ApiError> {
+    rate_limit!(state, user);
     if let Some(count) = body.daily_count {
         if !(1..=20).contains(&count) {
             return Err(ApiError(AppError::Invalid(
