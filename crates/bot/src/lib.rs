@@ -10,7 +10,7 @@ use dayhelper_application::{
     CancelReminder, CreateReminder, CreateReminderCommand, EnsureUser, IssuePairCode,
     ListReminders,
 };
-use dayhelper_domain::{Recurrence, ReminderId};
+use dayhelper_domain::{Recurrence, ReminderId, Weekday};
 use dayhelper_scheduler::SchedulerHandle;
 use teloxide::prelude::*;
 use teloxide::utils::command::BotCommands;
@@ -40,6 +40,10 @@ pub enum Command {
     Once(String),
     #[command(description = "ежедневное напоминание: /daily 09:00 текст")]
     Daily(String),
+    #[command(description = "еженедельное напоминание: /weekly Mon,Wed,Fri 09:00 текст")]
+    Weekly(String),
+    #[command(description = "ежемесячное напоминание: /monthly 15 09:00 текст")]
+    Monthly(String),
     #[command(description = "отменить напоминание: /cancel <id>")]
     Cancel(String),
     #[command(description = "получить код для подключения desktop-клиента")]
@@ -156,6 +160,63 @@ async fn handle_command(
                     .await?;
             }
         },
+        Command::Weekly(args) => match parse_weekly(&args) {
+            Ok((weekdays, time, text)) => {
+                let r = deps
+                    .create_reminder
+                    .execute(CreateReminderCommand {
+                        user_id: user.id,
+                        user_timezone: user.timezone,
+                        text,
+                        recurrence: Recurrence::Weekly { weekdays, time },
+                    })
+                    .await
+                    .map_err(into_anyhow)?;
+                deps.scheduler.wakeup();
+                bot.send_message(
+                    msg.chat.id,
+                    format!("Еженедельное напоминание {}", short_id(r.id.0)),
+                )
+                .await?;
+            }
+            Err(e) => {
+                bot.send_message(
+                    msg.chat.id,
+                    format!("Не понял: {e}\nПример: /weekly Mon,Wed,Fri 09:00 зарядка"),
+                )
+                .await?;
+            }
+        },
+        Command::Monthly(args) => match parse_monthly(&args) {
+            Ok((day, time, text)) => {
+                let r = deps
+                    .create_reminder
+                    .execute(CreateReminderCommand {
+                        user_id: user.id,
+                        user_timezone: user.timezone,
+                        text,
+                        recurrence: Recurrence::Monthly {
+                            day_of_month: day,
+                            time,
+                        },
+                    })
+                    .await
+                    .map_err(into_anyhow)?;
+                deps.scheduler.wakeup();
+                bot.send_message(
+                    msg.chat.id,
+                    format!("Ежемесячное напоминание {}", short_id(r.id.0)),
+                )
+                .await?;
+            }
+            Err(e) => {
+                bot.send_message(
+                    msg.chat.id,
+                    format!("Не понял: {e}\nПример: /monthly 15 09:00 оплатить счёт"),
+                )
+                .await?;
+            }
+        },
         Command::Pair => {
             let code = deps
                 .issue_pair_code
@@ -226,6 +287,58 @@ fn parse_daily(args: &str) -> Result<(chrono::NaiveTime, String), String> {
     }
     let t = chrono::NaiveTime::parse_from_str(time, "%H:%M").map_err(|e| e.to_string())?;
     Ok((t, text))
+}
+
+fn parse_weekly(args: &str) -> Result<(Vec<Weekday>, chrono::NaiveTime, String), String> {
+    let mut parts = args.splitn(3, char::is_whitespace);
+    let weekdays_str = parts.next().ok_or("нет дней недели")?.trim();
+    let time_str = parts.next().ok_or("нет времени")?.trim();
+    let text = parts.next().ok_or("нет текста")?.trim().to_string();
+    if text.is_empty() {
+        return Err("пустой текст".into());
+    }
+    let weekdays: Vec<Weekday> = weekdays_str
+        .split(',')
+        .map(|s| parse_weekday(s.trim()).ok_or_else(|| format!("неизвестный день: {s}")))
+        .collect::<Result<_, _>>()?;
+    if weekdays.is_empty() {
+        return Err("укажите хотя бы один день недели".into());
+    }
+    let time = chrono::NaiveTime::parse_from_str(time_str, "%H:%M")
+        .map_err(|e| format!("неверное время: {e}"))?;
+    Ok((weekdays, time, text))
+}
+
+fn parse_monthly(args: &str) -> Result<(u8, chrono::NaiveTime, String), String> {
+    let mut parts = args.splitn(3, char::is_whitespace);
+    let day_str = parts.next().ok_or("нет дня месяца")?.trim();
+    let time_str = parts.next().ok_or("нет времени")?.trim();
+    let text = parts.next().ok_or("нет текста")?.trim().to_string();
+    if text.is_empty() {
+        return Err("пустой текст".into());
+    }
+    let day: u8 = day_str
+        .parse()
+        .map_err(|_| "день месяца должен быть числом от 1 до 31".to_string())?;
+    if !(1..=31).contains(&day) {
+        return Err("день месяца должен быть от 1 до 31".into());
+    }
+    let time = chrono::NaiveTime::parse_from_str(time_str, "%H:%M")
+        .map_err(|e| format!("неверное время: {e}"))?;
+    Ok((day, time, text))
+}
+
+fn parse_weekday(s: &str) -> Option<Weekday> {
+    match s.to_lowercase().as_str() {
+        "mon" | "пн" => Some(Weekday::Mon),
+        "tue" | "вт" => Some(Weekday::Tue),
+        "wed" | "ср" => Some(Weekday::Wed),
+        "thu" | "чт" => Some(Weekday::Thu),
+        "fri" | "пт" => Some(Weekday::Fri),
+        "sat" | "сб" => Some(Weekday::Sat),
+        "sun" | "вс" => Some(Weekday::Sun),
+        _ => None,
+    }
 }
 
 fn short_id(uuid: Uuid) -> String {
