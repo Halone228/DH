@@ -1,0 +1,12 @@
+@import "tailwindcss";
+
+/* Telegram theme variables */
+:root {
+  --tg-bg-color: #ffffff;
+  --tg-text-color: #000000;
+  --tg-hint-color: #999999;
+  --tg-button-color: #2481cc;
+  --tg-button-text-color: #ffffff;
+  --tg-secondary-bg-color: #f0f0f0;
+  --tg-destructive-color: #e53935;
+}
