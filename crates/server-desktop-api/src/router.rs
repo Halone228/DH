@@ -1,3 +1,7 @@
+use std::collections::HashMap;
+use std::sync::{Mutex, OnceLock};
+use std::time::{Duration, Instant};
+
 use axum::{
     extract::State,
     http::StatusCode,
@@ -13,6 +17,15 @@ use tracing::warn;
 use crate::auth::AuthedDesktop;
 use crate::state::ServerDesktopState;
 
+/// Global rate limiter for `/api/desktop/pair`: 10 attempts per minute.
+/// Pair codes are 6-digit — limiting brute-force is critical.
+static PAIR_LIMITER: OnceLock<Mutex<HashMap<i64, (Instant, u32)>>> = OnceLock::new();
+const PAIR_MAX: u32 = 10;
+const PAIR_WINDOW: Duration = Duration::from_secs(60);
+/// Global key — pair endpoint is unauthenticated, so we rate-limit by a
+/// fixed sentinel to cap total attempts across all callers.
+const PAIR_GLOBAL_KEY: i64 = 0;
+
 pub fn build_router(state: ServerDesktopState) -> Router {
     Router::new()
         .route("/api/desktop/pair", post(pair))
@@ -25,6 +38,23 @@ async fn pair(
     State(state): State<ServerDesktopState>,
     Json(req): Json<PairRequest>,
 ) -> Result<Json<PairResponse>, ApiError> {
+    // Rate-limit pair attempts (brute-force protection for 6-digit codes).
+    let limiter = PAIR_LIMITER.get_or_init(|| Mutex::new(HashMap::new()));
+    {
+        let mut map = limiter.lock().unwrap();
+        let now = Instant::now();
+        let entry = map.entry(PAIR_GLOBAL_KEY).or_insert((now, 0));
+        if now.duration_since(entry.0) > PAIR_WINDOW {
+            *entry = (now, 1);
+        } else if entry.1 < PAIR_MAX {
+            entry.1 += 1;
+        } else {
+            return Err(ApiError(AppError::Invalid(
+                "Too many pairing attempts. Try again later.".into(),
+            )));
+        }
+    }
+
     let outcome = state
         .redeem_pair_code
         .execute(&req.code, req.device_label)

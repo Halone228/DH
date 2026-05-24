@@ -102,6 +102,7 @@ impl Scheduler {
     }
 
     async fn fire_loop(self: Arc<Self>, shutdown: &mut tokio::sync::broadcast::Receiver<()>) {
+        info!("fire_loop started");
         loop {
             loop {
                 match self.fire.tick().await {
@@ -139,6 +140,7 @@ impl Scheduler {
     }
 
     async fn nudge_planner_loop(self: Arc<Self>, shutdown: &mut tokio::sync::broadcast::Receiver<()>) {
+        info!("nudge_planner_loop started");
         let mut tick = tokio::time::interval(NUDGE_PLAN_INTERVAL);
         loop {
             tokio::select! {
@@ -190,6 +192,7 @@ impl Scheduler {
     }
 
     async fn prune_loop(self: Arc<Self>, shutdown: &mut tokio::sync::broadcast::Receiver<()>) {
+        info!("prune_loop started");
         // First tick after a short delay so we don't fight with bootstrap;
         // subsequent ticks every 24h.
         tokio::select! {
