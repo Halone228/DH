@@ -38,13 +38,15 @@ struct MeResponse {
     user_id: Uuid,
     telegram_id: i64,
     timezone: String,
+    is_new: bool,
 }
 
-async fn me(AuthedUser(user): AuthedUser) -> Json<MeResponse> {
+async fn me(AuthedUser { user, is_new }: AuthedUser) -> Json<MeResponse> {
     Json(MeResponse {
         user_id: user.id.0,
         telegram_id: user.telegram_id.0,
         timezone: user.timezone.name().to_string(),
+        is_new,
     })
 }
 
@@ -55,7 +57,7 @@ struct UpdateMeRequest {
 
 async fn update_me(
     State(state): State<TmaState>,
-    AuthedUser(user): AuthedUser,
+    AuthedUser { user, is_new: _ }: AuthedUser,
     Json(body): Json<UpdateMeRequest>,
 ) -> Result<Json<MeResponse>, ApiError> {
     if let Some(ref tz) = body.timezone {
@@ -72,6 +74,7 @@ async fn update_me(
         user_id: user.id.0,
         telegram_id: user.telegram_id.0,
         timezone: updated_tz.name().to_string(),
+        is_new: false,
     }))
 }
 
@@ -88,7 +91,7 @@ struct ReminderDto {
 
 async fn list_reminders(
     State(state): State<TmaState>,
-    AuthedUser(user): AuthedUser,
+    AuthedUser { user, is_new: _ }: AuthedUser,
 ) -> Result<Json<Vec<ReminderDto>>, ApiError> {
     let items = state.list_reminders.execute(user.id).await?;
     let dto = items
@@ -134,7 +137,7 @@ struct CreateReminderRequest {
 
 async fn create_reminder(
     State(state): State<TmaState>,
-    AuthedUser(user): AuthedUser,
+    AuthedUser { user, is_new: _ }: AuthedUser,
     Json(req): Json<CreateReminderRequest>,
 ) -> Result<Json<ReminderDto>, ApiError> {
     let r = state
@@ -158,7 +161,7 @@ async fn create_reminder(
 
 async fn cancel_reminder(
     State(state): State<TmaState>,
-    AuthedUser(user): AuthedUser,
+    AuthedUser { user, is_new: _ }: AuthedUser,
     Path(id): Path<Uuid>,
 ) -> Result<StatusCode, ApiError> {
     // Ownership check: verify the reminder belongs to the authenticated user.
@@ -199,7 +202,7 @@ impl From<dayhelper_domain::NudgeSettings> for NudgeSettingsDto {
 
 async fn get_nudge_settings(
     State(state): State<TmaState>,
-    AuthedUser(user): AuthedUser,
+    AuthedUser { user, is_new: _ }: AuthedUser,
 ) -> Result<Json<NudgeSettingsDto>, ApiError> {
     let settings = state.update_nudge_settings.get(user.id).await?;
     Ok(Json(NudgeSettingsDto::from(settings)))
@@ -215,7 +218,7 @@ struct UpdateNudgeSettingsRequest {
 
 async fn update_nudge_settings(
     State(state): State<TmaState>,
-    AuthedUser(user): AuthedUser,
+    AuthedUser { user, is_new: _ }: AuthedUser,
     Json(body): Json<UpdateNudgeSettingsRequest>,
 ) -> Result<Json<NudgeSettingsDto>, ApiError> {
     if let Some(count) = body.daily_count {

@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { api } from '../api/client';
 import { useTelegram } from '../hooks/useTelegram';
 import { ReminderCard } from '../components/ReminderCard';
+import { WelcomeCard } from '../components/WelcomeCard';
 import { t } from '../i18n/ru';
 
 interface Reminder {
@@ -21,6 +22,7 @@ export function ReminderList() {
   const [reminders, setReminders] = useState<Reminder[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isNew, setIsNew] = useState(false);
 
   const fetchReminders = useCallback(async () => {
     try {
@@ -37,6 +39,12 @@ export function ReminderList() {
   useEffect(() => {
     fetchReminders();
   }, [fetchReminders]);
+
+  useEffect(() => {
+    api.getMe().then((me: any) => {
+      if (me?.is_new) setIsNew(true);
+    }).catch(() => {});
+  }, []);
 
   useEffect(() => {
     if (!tg) return;
@@ -81,7 +89,9 @@ export function ReminderList() {
         </div>
       )}
 
-      {reminders.length === 0 ? (
+      {isNew && reminders.length === 0 ? (
+        <WelcomeCard onCreate={() => navigate('/create')} />
+      ) : reminders.length === 0 ? (
         <div className="flex flex-col items-center justify-center py-16 text-center">
           <span className="text-5xl mb-4">📭</span>
           <p className="text-[var(--tg-text-color)] font-medium mb-1">

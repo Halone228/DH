@@ -137,7 +137,10 @@ struct TmaUser {
 
 /// Axum extractor that verifies `initData` from the `Authorization: tma <data>`
 /// header (or the `X-Init-Data` header) and resolves the corresponding `User`.
-pub struct AuthedUser(pub User);
+pub struct AuthedUser {
+    pub user: User,
+    pub is_new: bool,
+}
 
 #[async_trait::async_trait]
 impl FromRequestParts<TmaState> for AuthedUser {
@@ -164,7 +167,9 @@ impl FromRequestParts<TmaState> for AuthedUser {
                     message: "ensure_user failed",
                 }
             })?;
-        Ok(AuthedUser(result.user().clone()))
+        let is_new = matches!(&result, dayhelper_application::EnsureResult::New(_));
+        let user = result.user().clone();
+        Ok(AuthedUser { user, is_new })
     }
 }
 

@@ -1,0 +1,11 @@
+{
+  "dependencies": {
+    "@tma.js/sdk": "^3.2.0",
+    "@tma.js/sdk-react": "^3.0.19",
+    "react-router-dom": "^7.15.1"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "^4.3.0",
+    "tailwindcss": "^4.3.0"
+  }
+}

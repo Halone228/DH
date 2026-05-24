@@ -60,6 +60,13 @@ export const t = {
   },
   settings: { save: 'Сохранить', saved: 'Настройки сохранены' },
   profile: { timezone: 'Часовой пояс' },
+  welcome: {
+    title: 'Добро пожаловать в DayHelper!',
+    description: 'Я помогу тебе не забывать о важном и не дать прокрастинировать.',
+    createFirst: 'Создать первое напоминание',
+    hintSettings: 'Нуджи',
+    hintProfile: 'Часовой пояс',
+  },
   error: {
     network: 'Ошибка сети. Попробуйте позже.',
     validation: 'Проверьте введённые данные',
