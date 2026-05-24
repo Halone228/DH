@@ -84,8 +84,18 @@ export function ReminderList() {
       </h1>
 
       {error && (
-        <div className="mb-4 p-3 rounded-lg bg-red-50 text-[var(--tg-destructive-color)] text-sm">
-          {error}
+        <div className="mb-4 p-3 rounded-lg bg-red-50 text-[var(--tg-destructive-color)] text-sm flex items-center justify-between">
+          <span>{error}</span>
+          <button
+            onClick={() => { setLoading(true); fetchReminders(); }}
+            className="ml-2 px-3 py-1 rounded-lg text-xs font-medium"
+            style={{
+              backgroundColor: 'var(--tg-button-color)',
+              color: 'var(--tg-button-text-color)',
+            }}
+          >
+            {t.error.retry}
+          </button>
         </div>
       )}
 
