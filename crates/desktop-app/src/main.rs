@@ -66,7 +66,14 @@ async fn login(
         .execute(code, label, server_url)
         .await
         .context("pair")?;
-    println!("paired as user {}", creds.user_id);
+    println!("✓ Paired successfully (user {}).", creds.user_id);
+    println!();
+    println!("Next steps:");
+    println!("  dayhelper-cli daemon");
+    println!();
+    println!("For autostart:");
+    println!("  cp contrib/dayhelper-daemon.service ~/.config/systemd/user/");
+    println!("  systemctl --user enable --now dayhelper-daemon");
     Ok(())
 }
 

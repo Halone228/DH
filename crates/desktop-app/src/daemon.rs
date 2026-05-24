@@ -24,7 +24,14 @@ pub async fn run(container: Arc<DesktopContainer>, opts: DaemonOptions) -> anyho
     // actionable error early instead of failing every minute.
     let creds = container.credentials.load().await?;
     if creds.is_none() {
-        anyhow::bail!("not paired — run `dayhelper-cli login <code>` first");
+        anyhow::bail!(
+            "Not paired.\n\n\
+             Steps:\n\
+             1. Open your DayHelper bot in Telegram\n\
+             2. Send /pair\n\
+             3. Run: dayhelper-cli login <code>\n\
+             4. Run: dayhelper-cli daemon"
+        );
     }
 
     let (focus_tx, focus_rx) = mpsc::channel::<FocusChange>(64);
