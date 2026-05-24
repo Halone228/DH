@@ -12,6 +12,7 @@ chrono = { workspace = true }
 chrono-tz = { workspace = true }
 dayhelper-domain = { workspace = true }
 dayhelper-ports = { workspace = true }
+rand = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 sqlx = { workspace = true }

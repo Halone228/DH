@@ -7,6 +7,7 @@ mod desktop_activity_repo;
 mod desktop_token_repo;
 mod job_queue;
 mod nudge_settings;
+mod pair_codes;
 mod reminder_repo;
 mod user_repo;
 
@@ -16,6 +17,7 @@ pub use desktop_activity_repo::SqliteDesktopActivityRepo;
 pub use desktop_token_repo::SqliteDesktopTokenRepo;
 pub use job_queue::SqliteJobQueue;
 pub use nudge_settings::SqliteNudgeSettingsRepo;
+pub use pair_codes::SqlitePairCodeStore;
 pub use reminder_repo::SqliteReminderRepo;
 pub use user_repo::SqliteUserRepo;
 

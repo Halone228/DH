@@ -10,13 +10,14 @@ use std::sync::Arc;
 
 use dayhelper_adapter_sqlite::{
     SqliteDesktopActivityRepo, SqliteDesktopTokenRepo, SqliteJobQueue, SqliteNudgeSettingsRepo,
-    SqlitePool, SqliteReminderRepo, SqliteUserRepo,
+    SqlitePairCodeStore, SqlitePool, SqliteReminderRepo, SqliteUserRepo,
 };
-use dayhelper_adapter_system::{MemoryPairCodeStore, OsRandom, SystemClock};
+use dayhelper_adapter_system::{OsRandom, SystemClock};
 use dayhelper_adapter_telegram::TelegramNotifier;
 use dayhelper_application::{
     AcceptDesktopSync, CancelReminder, CreateReminder, EnsureUser, FireDueJobs, IssuePairCode,
     ListReminders, PruneOldData, PruneRetention, RedeemPairCode, ScheduleDailyNudges,
+    UpdateNudgeSettings, UpdateTimezone,
 };
 use dayhelper_ports::{
     Clock, DesktopActivityRepo, DesktopTokenRepo, JobQueue, Notifier, NudgeSettingsRepo,
@@ -54,6 +55,8 @@ pub struct Container {
     pub redeem_pair_code: Arc<RedeemPairCode>,
     pub accept_desktop_sync: Arc<AcceptDesktopSync>,
     pub prune_old_data: Arc<PruneOldData>,
+    pub update_timezone: Arc<UpdateTimezone>,
+    pub update_nudge_settings: Arc<UpdateNudgeSettings>,
 
     pub scheduler: Arc<Scheduler>,
 }
@@ -75,8 +78,8 @@ impl Container {
         let desktop_tokens: Arc<dyn DesktopTokenRepo> =
             Arc::new(SqliteDesktopTokenRepo::new(pool.clone()));
         let desktop_activity: Arc<dyn DesktopActivityRepo> =
-            Arc::new(SqliteDesktopActivityRepo::new(pool));
-        let pair_codes: Arc<dyn PairCodeStore> = Arc::new(MemoryPairCodeStore::new());
+            Arc::new(SqliteDesktopActivityRepo::new(pool.clone()));
+        let pair_codes: Arc<dyn PairCodeStore> = Arc::new(SqlitePairCodeStore::new(pool));
 
         // Use cases — pure constructor injection.
         let ensure_user = Arc::new(EnsureUser::new(users.clone()));
@@ -112,6 +115,8 @@ impl Container {
             reminders.clone(),
             clock.clone(),
         ));
+        let update_timezone = Arc::new(UpdateTimezone::new(users.clone()));
+        let update_nudge_settings = Arc::new(UpdateNudgeSettings::new(nudge_settings.clone()));
         let prune_old_data = Arc::new(PruneOldData::new(
             jobs.clone(),
             desktop_activity.clone(),
@@ -152,6 +157,8 @@ impl Container {
             redeem_pair_code,
             accept_desktop_sync,
             prune_old_data,
+            update_timezone,
+            update_nudge_settings,
             scheduler,
         }
     }
