@@ -1,4 +1,4 @@
-import { t } from '../i18n/ru';
+import { useTranslation } from 'react-i18next';
 
 type RecurrenceKind = 'once' | 'daily' | 'weekly' | 'monthly';
 
@@ -7,14 +7,16 @@ interface RecurrenceFormProps {
   onChange: (v: RecurrenceKind) => void;
 }
 
-const OPTIONS: { key: RecurrenceKind; label: string }[] = [
-  { key: 'once', label: t.reminder.typeOnce },
-  { key: 'daily', label: t.reminder.typeDaily },
-  { key: 'weekly', label: t.reminder.typeWeekly },
-  { key: 'monthly', label: t.reminder.typeMonthly },
+const OPTIONS: { key: RecurrenceKind; labelKey: string }[] = [
+  { key: 'once', labelKey: 'reminder.typeOnce' },
+  { key: 'daily', labelKey: 'reminder.typeDaily' },
+  { key: 'weekly', labelKey: 'reminder.typeWeekly' },
+  { key: 'monthly', labelKey: 'reminder.typeMonthly' },
 ];
 
 export function RecurrenceForm({ value, onChange }: RecurrenceFormProps) {
+  const { t } = useTranslation();
+
   return (
     <div className="flex gap-1 bg-[var(--tg-secondary-bg-color)] rounded-lg p-1">
       {OPTIONS.map((opt) => (
@@ -28,7 +30,7 @@ export function RecurrenceForm({ value, onChange }: RecurrenceFormProps) {
               : 'text-[var(--tg-text-color)]'
           }`}
         >
-          {opt.label}
+          {t(opt.labelKey)}
         </button>
       ))}
     </div>

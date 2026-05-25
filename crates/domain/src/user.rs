@@ -2,6 +2,7 @@ use chrono_tz::Tz;
 use serde::{Deserialize, Serialize};
 
 use crate::ids::{TelegramUserId, UserId};
+use crate::locale::Locale;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct User {
@@ -9,7 +10,7 @@ pub struct User {
     pub telegram_id: TelegramUserId,
     pub username: Option<String>,
     pub timezone: Tz,
-    pub locale: String,
+    pub locale: Locale,
 }
 
 impl User {
@@ -19,7 +20,7 @@ impl User {
             telegram_id,
             username: None,
             timezone,
-            locale: "ru".to_string(),
+            locale: Locale::Ru,
         }
     }
 }

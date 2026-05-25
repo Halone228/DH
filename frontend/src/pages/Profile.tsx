@@ -1,7 +1,7 @@
 import { useEffect, useState, useCallback } from 'react';
+import { useTranslation } from 'react-i18next';
 import { api } from '../api/client';
 import { useTelegram } from '../hooks/useTelegram';
-import { t } from '../i18n/ru';
 
 const COMMON_ZONES = [
   'Europe/Moscow',
@@ -33,6 +33,7 @@ function getAllTimezones(): string[] {
 }
 
 export function Profile() {
+  const { t } = useTranslation();
   const { tg, user } = useTelegram();
   const [timezone, setTimezone] = useState('Europe/Moscow');
   const [originalTz, setOriginalTz] = useState('Europe/Moscow');
@@ -49,11 +50,11 @@ export function Profile() {
       setTimezone(tz);
       setOriginalTz(tz);
     } catch {
-      setError(t.error.network);
+      setError(t('error.network'));
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     fetchMe();
@@ -65,7 +66,7 @@ export function Profile() {
     if (!tg) return;
     if (isDirty) {
       tg.MainButton.setParams({
-        text: t.settings.save,
+        text: t('settings.save'),
         color: 'var(--tg-button-color)',
         text_color: 'var(--tg-button-text-color)',
         is_visible: true,
@@ -74,7 +75,7 @@ export function Profile() {
     } else {
       tg.MainButton.hide?.();
     }
-  }, [tg, isDirty]);
+  }, [tg, isDirty, t]);
 
   useEffect(() => {
     if (!tg) return;
@@ -86,7 +87,7 @@ export function Profile() {
         setOriginalTz(timezone);
         tg.HapticFeedback?.notificationOccurred('success');
       } catch {
-        setError(t.error.network);
+        setError(t('error.network'));
       } finally {
         setSaving(false);
       }
@@ -105,7 +106,7 @@ export function Profile() {
   if (loading) {
     return (
       <div className="flex items-center justify-center py-20">
-        <div className="text-[var(--tg-hint-color)]">Загрузка...</div>
+        <div className="text-[var(--tg-hint-color)]">{t('reminder.loading')}</div>
       </div>
     );
   }
@@ -113,7 +114,7 @@ export function Profile() {
   return (
     <div className="px-4 pt-4">
       <h1 className="text-xl font-bold mb-4 text-[var(--tg-text-color)]">
-        {t.nav.profile}
+        {t('nav.profile')}
       </h1>
 
       {error && (
@@ -141,14 +142,14 @@ export function Profile() {
         {/* Timezone */}
         <div>
           <label className="block text-sm font-medium text-[var(--tg-text-color)] mb-1.5">
-            {t.profile.timezone}
+            {t('profile.timezone')}
           </label>
 
           <input
             type="text"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Поиск..."
+            placeholder={t('profile.searchPlaceholder')}
             className="w-full rounded-xl px-3 py-2.5 text-sm bg-[var(--tg-secondary-bg-color)] text-[var(--tg-text-color)] placeholder-[var(--tg-hint-color)] outline-none focus:ring-2 focus:ring-[var(--tg-button-color)] mb-2"
           />
 
@@ -169,7 +170,7 @@ export function Profile() {
             {filteredOther.length > 0 && (
               <>
                 <div className="px-3 py-1.5 text-xs text-[var(--tg-hint-color)] border-t border-[var(--tg-secondary-bg-color)]">
-                  Все часовые пояса
+                  {t('profile.allTimezones')}
                 </div>
                 {filteredOther.slice(0, 100).map((z) => (
                   <button

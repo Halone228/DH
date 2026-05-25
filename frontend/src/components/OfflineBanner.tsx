@@ -1,6 +1,8 @@
+import { useTranslation } from 'react-i18next';
 import { useOnlineStatus } from '../hooks/useOnlineStatus';
 
 export function OfflineBanner() {
+  const { t } = useTranslation();
   const isOnline = useOnlineStatus();
   if (isOnline) return null;
   return (
@@ -8,7 +10,7 @@ export function OfflineBanner() {
       className="fixed top-0 left-0 right-0 z-50 py-2 text-center text-sm text-white"
       style={{ backgroundColor: 'var(--tg-destructive-text-color, #e53935)' }}
     >
-      Нет подключения к интернету
+      {t('error.offline')}
     </div>
   );
 }

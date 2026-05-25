@@ -7,6 +7,7 @@ use std::sync::Arc;
 use chrono_tz::Tz;
 use chrono::{Offset, TimeZone};
 use dayhelper_application::{
+    l10n::BotMessages,
     CancelReminder, CreateReminder, CreateReminderCommand, EnsureResult, EnsureUser,
     IssuePairCode, ListReminders, UpdateNudgeSettings, UpdateTimezone,
 };
@@ -33,33 +34,33 @@ pub struct BotDeps {
 }
 
 #[derive(BotCommands, Clone, Debug)]
-#[command(rename_rule = "lowercase", description = "Команды бота:")]
+#[command(rename_rule = "lowercase", description = "Bot commands:")]
 pub enum Command {
-    #[command(description = "приветствие и открытие приложения")]
+    #[command(description = "greeting and app link")]
     Start,
-    #[command(description = "показать список напоминаний")]
+    #[command(description = "list reminders")]
     List,
-    #[command(description = "разовое напоминание: /once 2026-05-04T10:00 текст")]
+    #[command(description = "one-shot reminder: /once 2026-05-04T10:00 text")]
     Once(String),
-    #[command(description = "ежедневное напоминание: /daily 09:00 текст")]
+    #[command(description = "daily reminder: /daily 09:00 text")]
     Daily(String),
-    #[command(description = "еженедельное напоминание: /weekly Mon,Wed,Fri 09:00 текст")]
+    #[command(description = "weekly reminder: /weekly Mon,Wed,Fri 09:00 text")]
     Weekly(String),
-    #[command(description = "ежемесячное напоминание: /monthly 15 09:00 текст")]
+    #[command(description = "monthly reminder: /monthly 15 09:00 text")]
     Monthly(String),
-    #[command(description = "отменить напоминание: /cancel <id>")]
+    #[command(description = "cancel reminder: /cancel <id>")]
     Cancel(String),
-    #[command(description = "получить код для подключения desktop-клиента")]
+    #[command(description = "get desktop pairing code")]
     Pair,
-    #[command(description = "изменить часовой пояс: /timezone Europe/Moscow")]
+    #[command(description = "change timezone: /timezone Europe/Moscow")]
     Timezone(String),
-    #[command(description = "включить/выключить нуджи: /nudge on или /nudge off")]
+    #[command(description = "toggle nudges: /nudge on or /nudge off")]
     Nudge(String),
-    #[command(description = "окно нуджей: /nudge_window 09:00 21:00")]
+    #[command(description = "nudge window: /nudge_window 09:00 21:00")]
     NudgeWindow(String),
-    #[command(description = "показать текущие настройки")]
+    #[command(description = "show current settings")]
     Settings,
-    #[command(description = "помощь")]
+    #[command(description = "help")]
     Help,
 }
 
@@ -109,21 +110,16 @@ async fn handle_command(
     };
     let is_new = matches!(user, EnsureResult::New(_));
     let user = user.user().clone();
+    let l = BotMessages::for_locale(user.locale);
     tracing::Span::current().record("user_id", user.id.0.to_string());
     tracing::Span::current().record("cmd", format!("{cmd:?}"));
 
     match cmd {
         Command::Start => {
             let text = if is_new {
-                format!(
-                    "Привет! 👋 Я DayHelper — напоминания и анти-прокрастинация.\n\n\
-                     📱 Мини-приложение: {}\n\
-                     🖥️ Desktop-клиент: отправь /pair\n\n\
-                     Все команды: /help",
-                    deps.tma_url
-                )
+                l.start_new.replace("{}", &deps.tma_url)
             } else {
-                format!("С возвращением! Открой приложение: {}", deps.tma_url)
+                l.start_existing.replace("{}", &deps.tma_url)
             };
             bot.send_message(msg.chat.id, text).await?;
         }
@@ -141,7 +137,7 @@ async fn handle_command(
                 Err(e) => return reply_error(&bot, msg.chat.id, e).await,
             };
             if items.is_empty() {
-                bot.send_message(msg.chat.id, "Активных напоминаний нет.").await?;
+                bot.send_message(msg.chat.id, l.list_empty).await?;
             } else {
                 let keyboard: Vec<Vec<InlineKeyboardButton>> = items
                     .iter()
@@ -152,7 +148,7 @@ async fn handle_command(
                         )]
                     })
                     .collect();
-                bot.send_message(msg.chat.id, "Напоминания (нажми чтобы отменить):")
+                bot.send_message(msg.chat.id, l.list_header)
                     .reply_markup(InlineKeyboardMarkup::new(keyboard))
                     .await?;
             }
@@ -176,12 +172,12 @@ async fn handle_command(
                     deps.scheduler.wakeup();
                     bot.send_message(
                         msg.chat.id,
-                        format!("Создано напоминание {}", short_id(r.id.0)),
+                        l.reminder_created.replace("{}", &short_id(r.id.0)),
                     )
                     .await?;
                 }
                 Err(e) => {
-                    bot.send_message(msg.chat.id, format!("Не понял: {e}\nПример: /once 2026-05-04T10:00 позвонить маме"))
+                    bot.send_message(msg.chat.id, l.parse_once_hint.replace("{}", &e.to_string()))
                         .await?;
                 }
             }
@@ -204,12 +200,12 @@ async fn handle_command(
                 deps.scheduler.wakeup();
                 bot.send_message(
                     msg.chat.id,
-                    format!("Ежедневное напоминание {}", short_id(r.id.0)),
+                    l.daily_created.replace("{}", &short_id(r.id.0)),
                 )
                 .await?;
             }
             Err(e) => {
-                bot.send_message(msg.chat.id, format!("Не понял: {e}\nПример: /daily 09:00 зарядка"))
+                bot.send_message(msg.chat.id, l.parse_daily_hint.replace("{}", &e.to_string()))
                     .await?;
             }
         },
@@ -231,14 +227,14 @@ async fn handle_command(
                 deps.scheduler.wakeup();
                 bot.send_message(
                     msg.chat.id,
-                    format!("Еженедельное напоминание {}", short_id(r.id.0)),
+                    l.weekly_created.replace("{}", &short_id(r.id.0)),
                 )
                 .await?;
             }
             Err(e) => {
                 bot.send_message(
                     msg.chat.id,
-                    format!("Не понял: {e}\nПример: /weekly Mon,Wed,Fri 09:00 зарядка"),
+                    l.parse_weekly_hint.replace("{}", &e.to_string()),
                 )
                 .await?;
             }
@@ -264,14 +260,14 @@ async fn handle_command(
                 deps.scheduler.wakeup();
                 bot.send_message(
                     msg.chat.id,
-                    format!("Ежемесячное напоминание {}", short_id(r.id.0)),
+                    l.monthly_created.replace("{}", &short_id(r.id.0)),
                 )
                 .await?;
             }
             Err(e) => {
                 bot.send_message(
                     msg.chat.id,
-                    format!("Не понял: {e}\nПример: /monthly 15 09:00 оплатить счёт"),
+                    l.parse_monthly_hint.replace("{}", &e.to_string()),
                 )
                 .await?;
             }
@@ -283,9 +279,9 @@ async fn handle_command(
             };
             bot.send_message(
                 msg.chat.id,
-                format!(
-                    "Код для подключения desktop-клиента (действует 5 минут):\n\n  {code}\n\nВведи на устройстве:\n  dayhelper-cli login {code}"
-                ),
+                l.pair_success
+                    .replacen("{}", &code, 1)
+                    .replacen("{}", &code, 1),
             )
             .await?;
         }
@@ -297,10 +293,10 @@ async fn handle_command(
                         return reply_error(&bot, msg.chat.id, e).await;
                     }
                     deps.scheduler.wakeup();
-                    bot.send_message(msg.chat.id, "Отменено.").await?;
+                    bot.send_message(msg.chat.id, l.reminder_cancelled).await?;
                 }
                 Err(_) => {
-                    bot.send_message(msg.chat.id, "Нужен полный UUID напоминания.")
+                    bot.send_message(msg.chat.id, l.need_full_uuid)
                         .await?;
                 }
             }
@@ -308,25 +304,22 @@ async fn handle_command(
         Command::Timezone(arg) => {
             let tz_str = arg.trim();
             if tz_str.is_empty() {
-                bot.send_message(
-                    msg.chat.id,
-                    "Укажите часовой пояс.\nПример: /timezone Europe/Moscow",
-                )
-                .await?;
+                bot.send_message(msg.chat.id, l.timezone_specify)
+                    .await?;
                 return Ok(());
             }
             match deps.update_timezone.execute(user.id, tz_str).await {
                 Ok(()) => {
                     bot.send_message(
                         msg.chat.id,
-                        format!("Часовой пояс обновлён: {tz_str}"),
+                        l.timezone_updated.replace("{}", tz_str),
                     )
                     .await?;
                 }
                 Err(dayhelper_application::AppError::Invalid(_)) => {
                     bot.send_message(
                         msg.chat.id,
-                        format!("Неверный часовой пояс: {tz_str}\nПример: /timezone Europe/Moscow"),
+                        l.timezone_invalid.replace("{}", tz_str),
                     )
                     .await?;
                 }
@@ -339,11 +332,8 @@ async fn handle_command(
                 "on" | "вкл" | "1" => true,
                 "off" | "выкл" | "0" => false,
                 _ => {
-                    bot.send_message(
-                        msg.chat.id,
-                        "Укажите on или off.\nПример: /nudge on",
-                    )
-                    .await?;
+                    bot.send_message(msg.chat.id, l.nudge_specify)
+                        .await?;
                     return Ok(());
                 }
             };
@@ -353,12 +343,12 @@ async fn handle_command(
             {
                 return reply_error(&bot, msg.chat.id, e).await;
             }
-            let label = if enabled { "включены" } else { "выключены" };
-            bot.send_message(
-                msg.chat.id,
-                format!("Анти-прокрастинация {label}."),
-            )
-            .await?;
+            let label = if enabled {
+                l.nudge_enabled
+            } else {
+                l.nudge_disabled
+            };
+            bot.send_message(msg.chat.id, label).await?;
         }
         Command::NudgeWindow(arg) => {
             let mut parts = arg.trim().splitn(2, char::is_whitespace);
@@ -367,22 +357,16 @@ async fn handle_command(
             let start = match chrono::NaiveTime::parse_from_str(start_str, "%H:%M") {
                 Ok(t) => t,
                 Err(_) => {
-                    bot.send_message(
-                        msg.chat.id,
-                        "Неверный формат времени.\nПример: /nudge_window 09:00 21:00",
-                    )
-                    .await?;
+                    bot.send_message(msg.chat.id, l.nudge_window_invalid)
+                        .await?;
                     return Ok(());
                 }
             };
             let end = match chrono::NaiveTime::parse_from_str(end_str, "%H:%M") {
                 Ok(t) => t,
                 Err(_) => {
-                    bot.send_message(
-                        msg.chat.id,
-                        "Неверный формат времени.\nПример: /nudge_window 09:00 21:00",
-                    )
-                    .await?;
+                    bot.send_message(msg.chat.id, l.nudge_window_invalid)
+                        .await?;
                     return Ok(());
                 }
             };
@@ -390,11 +374,9 @@ async fn handle_command(
                 Ok(()) => {
                     bot.send_message(
                         msg.chat.id,
-                        format!(
-                            "Окно обновлено: {} — {}",
-                            start.format("%H:%M"),
-                            end.format("%H:%M")
-                        ),
+                        l.nudge_window_updated
+                            .replacen("{}", &start.format("%H:%M").to_string(), 1)
+                            .replacen("{}", &end.format("%H:%M").to_string(), 1),
                     )
                     .await?;
                 }
@@ -423,13 +405,22 @@ async fn handle_command(
                     String::new()
                 }
             );
-            let enabled_label = if settings.enabled { "включена" } else { "выключена" };
-            let text = format!
-                ("││͟ Настройки\n\nЧасовой пояс: {} (UTC{})\nАнти-прокрастинация: {}\nКоличество в день: {}\nАктивное окно: {} — {}",
+            let enabled_label = if settings.enabled {
+                l.settings_nudge_on
+            } else {
+                l.settings_nudge_off
+            };
+            let text = format!(
+                "{}\n\n{}: {} (UTC{})\n{}: {}\n{}: {}\n{}: {} — {}",
+                l.settings_header,
+                l.settings_tz,
                 user.timezone.name(),
                 offset_str,
+                l.settings_nudge,
                 enabled_label,
+                l.settings_count,
                 settings.daily_count,
+                l.settings_window,
                 settings.active_window_start.format("%H:%M"),
                 settings.active_window_end.format("%H:%M"),
             );
@@ -462,6 +453,7 @@ async fn handle_callback(
                     Err(e) => return reply_error(&bot, message.chat().id, e).await,
                 };
                 let user = user.user();
+                let l = BotMessages::for_locale(user.locale);
 
                 // Ownership check: only cancel reminders belonging to this user.
                 let items = match deps.list_reminders.execute(user.id).await {
@@ -469,7 +461,7 @@ async fn handle_callback(
                     Err(e) => return reply_error(&bot, message.chat().id, e).await,
                 };
                 if !items.iter().any(|r| r.id.0 == id) {
-                    bot.answer_callback_query(&q.id).text("Не найдено").await?;
+                    bot.answer_callback_query(&q.id).text(l.not_found).await?;
                     return Ok(());
                 }
 
@@ -479,17 +471,17 @@ async fn handle_callback(
                 deps.scheduler.wakeup();
 
                 bot.answer_callback_query(&q.id)
-                    .text("Отменено ✅")
+                    .text(l.callback_cancelled)
                     .await?;
                 bot.edit_message_text(
                     message.chat().id,
                     message.id(),
-                    "Напоминание отменено.",
+                    l.callback_cancelled_msg,
                 )
                 .await?;
             }
             Err(_) => {
-                bot.answer_callback_query(&q.id).text("Ошибка").await?;
+                bot.answer_callback_query(&q.id).text("Error").await?;
             }
         }
     }
@@ -498,10 +490,10 @@ async fn handle_callback(
 
 pub(crate) fn parse_once(args: &str, tz: Tz) -> Result<(chrono::DateTime<chrono::Utc>, String), String> {
     let mut parts = args.splitn(2, char::is_whitespace);
-    let datetime = parts.next().ok_or("нет даты")?.trim();
-    let text = parts.next().ok_or("нет текста")?.trim().to_string();
+    let datetime = parts.next().ok_or("no date")?.trim();
+    let text = parts.next().ok_or("no text")?.trim().to_string();
     if text.is_empty() {
-        return Err("пустой текст".into());
+        return Err("empty text".into());
     }
     let naive = chrono::NaiveDateTime::parse_from_str(datetime, "%Y-%m-%dT%H:%M")
         .map_err(|e| e.to_string())?;
@@ -515,7 +507,7 @@ pub(crate) fn parse_once(args: &str, tz: Tz) -> Result<(chrono::DateTime<chrono:
             let bumped = naive + chrono::Duration::minutes(1);
             tz.from_local_datetime(&bumped)
                 .single()
-                .ok_or("не удалось разрешить время (переход DST)".to_string())?
+                .ok_or("could not resolve time (DST transition)".to_string())?
         }
     };
     Ok((aware.with_timezone(&chrono::Utc), text))
@@ -523,10 +515,10 @@ pub(crate) fn parse_once(args: &str, tz: Tz) -> Result<(chrono::DateTime<chrono:
 
 pub(crate) fn parse_daily(args: &str) -> Result<(chrono::NaiveTime, String), String> {
     let mut parts = args.splitn(2, char::is_whitespace);
-    let time = parts.next().ok_or("нет времени")?.trim();
-    let text = parts.next().ok_or("нет текста")?.trim().to_string();
+    let time = parts.next().ok_or("no time")?.trim();
+    let text = parts.next().ok_or("no text")?.trim().to_string();
     if text.is_empty() {
-        return Err("пустой текст".into());
+        return Err("empty text".into());
     }
     let t = chrono::NaiveTime::parse_from_str(time, "%H:%M").map_err(|e| e.to_string())?;
     Ok((t, text))
@@ -534,40 +526,40 @@ pub(crate) fn parse_daily(args: &str) -> Result<(chrono::NaiveTime, String), Str
 
 pub(crate) fn parse_weekly(args: &str) -> Result<(Vec<Weekday>, chrono::NaiveTime, String), String> {
     let mut parts = args.splitn(3, char::is_whitespace);
-    let weekdays_str = parts.next().ok_or("нет дней недели")?.trim();
-    let time_str = parts.next().ok_or("нет времени")?.trim();
-    let text = parts.next().ok_or("нет текста")?.trim().to_string();
+    let weekdays_str = parts.next().ok_or("no weekdays")?.trim();
+    let time_str = parts.next().ok_or("no time")?.trim();
+    let text = parts.next().ok_or("no text")?.trim().to_string();
     if text.is_empty() {
-        return Err("пустой текст".into());
+        return Err("empty text".into());
     }
     let weekdays: Vec<Weekday> = weekdays_str
         .split(',')
-        .map(|s| parse_weekday(s.trim()).ok_or_else(|| format!("неизвестный день: {s}")))
+        .map(|s| parse_weekday(s.trim()).ok_or_else(|| format!("unknown day: {s}")))
         .collect::<Result<_, _>>()?;
     if weekdays.is_empty() {
-        return Err("укажите хотя бы один день недели".into());
+        return Err("specify at least one weekday".into());
     }
     let time = chrono::NaiveTime::parse_from_str(time_str, "%H:%M")
-        .map_err(|e| format!("неверное время: {e}"))?;
+        .map_err(|e| format!("invalid time: {e}"))?;
     Ok((weekdays, time, text))
 }
 
 pub(crate) fn parse_monthly(args: &str) -> Result<(u8, chrono::NaiveTime, String), String> {
     let mut parts = args.splitn(3, char::is_whitespace);
-    let day_str = parts.next().ok_or("нет дня месяца")?.trim();
-    let time_str = parts.next().ok_or("нет времени")?.trim();
-    let text = parts.next().ok_or("нет текста")?.trim().to_string();
+    let day_str = parts.next().ok_or("no day of month")?.trim();
+    let time_str = parts.next().ok_or("no time")?.trim();
+    let text = parts.next().ok_or("no text")?.trim().to_string();
     if text.is_empty() {
-        return Err("пустой текст".into());
+        return Err("empty text".into());
     }
     let day: u8 = day_str
         .parse()
-        .map_err(|_| "день месяца должен быть числом от 1 до 31".to_string())?;
+        .map_err(|_| "day of month must be a number 1-31".to_string())?;
     if !(1..=31).contains(&day) {
-        return Err("день месяца должен быть от 1 до 31".into());
+        return Err("day of month must be 1-31".into());
     }
     let time = chrono::NaiveTime::parse_from_str(time_str, "%H:%M")
-        .map_err(|e| format!("неверное время: {e}"))?;
+        .map_err(|e| format!("invalid time: {e}"))?;
     Ok((day, time, text))
 }
 
@@ -588,22 +580,23 @@ fn short_id(uuid: Uuid) -> String {
     uuid.to_string()[..8].to_string()
 }
 
-/// Map an application error to a user-friendly Russian message.
-fn format_app_error(e: &dayhelper_application::AppError) -> String {
+/// Map an application error to a user-friendly message.
+/// For locale-aware errors, callers should use `BotMessages` directly.
+fn format_app_error_default(e: &dayhelper_application::AppError) -> String {
     match e {
-        dayhelper_application::AppError::NotFound => "Не найдено.".to_string(),
+        dayhelper_application::AppError::NotFound => "Not found.".to_string(),
         dayhelper_application::AppError::Invalid(msg) => msg.clone(),
         dayhelper_application::AppError::Storage(_) | dayhelper_application::AppError::Notify(_) => {
-            "⚠️ Произошла ошибка. Попробуйте позже.".to_string()
+            "⚠️ An error occurred. Please try again later.".to_string()
         }
     }
 }
 
-/// Log error and reply to the user with a friendly Russian message.
+/// Log error and reply to the user with a friendly message.
 /// Returns `Ok(())` so teloxide does not retry.
 async fn reply_error(bot: &Bot, chat_id: ChatId, e: dayhelper_application::AppError) -> anyhow::Result<()> {
     error!(error = %e, "app error");
-    let _ = bot.send_message(chat_id, format_app_error(&e)).await;
+    let _ = bot.send_message(chat_id, format_app_error_default(&e)).await;
     Ok(())
 }
 

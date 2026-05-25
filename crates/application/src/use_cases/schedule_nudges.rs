@@ -6,6 +6,8 @@ use dayhelper_domain::{JobId, NudgeSettings, UserId};
 use dayhelper_ports::{Clock, JobKind, JobQueue, RandomSource, ScheduledJob};
 use tracing::debug;
 
+use dayhelper_domain::Locale;
+
 use crate::messages::nudge_text;
 use crate::AppError;
 
@@ -33,6 +35,7 @@ impl ScheduleDailyNudges {
         user_id: UserId,
         timezone: Tz,
         settings: &NudgeSettings,
+        locale: Locale,
     ) -> Result<(), AppError> {
         if !settings.enabled || settings.daily_count == 0 {
             return Ok(());
@@ -78,7 +81,7 @@ impl ScheduleDailyNudges {
                 id: JobId::new(),
                 user_id,
                 kind: JobKind::Nudge {
-                    message: nudge_text(rand_seed(fire_at)).to_string(),
+                    message: nudge_text(locale, rand_seed(fire_at)).to_string(),
                 },
                 fire_at,
                 created_at: now,
@@ -156,7 +159,7 @@ mod tests {
 
         let uid = UserId::new();
         let settings = default_settings(uid);
-        uc.execute(uid, Moscow, &settings).await.unwrap();
+        uc.execute(uid, Moscow, &settings, Locale::Ru).await.unwrap();
 
         assert_eq!(jobs.len().await, 5);
     }
@@ -171,7 +174,7 @@ mod tests {
         let uid = UserId::new();
         let mut settings = default_settings(uid);
         settings.enabled = false;
-        uc.execute(uid, Moscow, &settings).await.unwrap();
+        uc.execute(uid, Moscow, &settings, Locale::Ru).await.unwrap();
 
         assert_eq!(jobs.len().await, 0);
     }
@@ -185,11 +188,11 @@ mod tests {
 
         let uid = UserId::new();
         let settings = default_settings(uid);
-        uc.execute(uid, Moscow, &settings).await.unwrap();
+        uc.execute(uid, Moscow, &settings, Locale::Ru).await.unwrap();
         assert_eq!(jobs.len().await, 5);
 
         // Second call should be a no-op
-        uc.execute(uid, Moscow, &settings).await.unwrap();
+        uc.execute(uid, Moscow, &settings, Locale::Ru).await.unwrap();
         assert_eq!(jobs.len().await, 5, "should not double-schedule");
     }
 }

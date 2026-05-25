@@ -1,4 +1,4 @@
-import { t } from '../i18n/ru';
+import { useTranslation } from 'react-i18next';
 
 const WEEKDAY_KEYS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const;
 
@@ -8,6 +8,8 @@ interface WeekdayChipsProps {
 }
 
 export function WeekdayChips({ selected, onChange }: WeekdayChipsProps) {
+  const { t } = useTranslation();
+
   const toggle = (day: string) => {
     if (selected.includes(day)) {
       onChange(selected.filter((d) => d !== day));
@@ -31,7 +33,7 @@ export function WeekdayChips({ selected, onChange }: WeekdayChipsProps) {
                 : 'bg-[var(--tg-secondary-bg-color)] text-[var(--tg-text-color)]'
             }`}
           >
-            {t.weekdays[day]}
+            {t(`weekdays.${day}`)}
           </button>
         );
       })}

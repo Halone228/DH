@@ -1,4 +1,4 @@
-import { t } from '../i18n/ru';
+import { useTranslation } from 'react-i18next';
 
 interface ReminderCardProps {
   id: string;
@@ -23,12 +23,14 @@ export function ReminderCard({
   onCancel,
   tg,
 }: ReminderCardProps) {
+  const { t } = useTranslation();
+
   const recurrenceLabel =
-    t.recurrence[recurrence as keyof typeof t.recurrence] ?? recurrence;
+    t(`recurrence.${recurrence}`, recurrence);
 
   const handleCancel = () => {
     if (!tg) return;
-    tg.showConfirm(t.reminder.deleteConfirm, (ok: boolean) => {
+    tg.showConfirm(t('reminder.deleteConfirm'), (ok: boolean) => {
       if (ok) onCancel(id);
     });
   };
@@ -51,25 +53,25 @@ export function ReminderCard({
             )}
             {weekdays && weekdays.length > 0 && (
               <span className="inline-block text-xs px-2 py-0.5 rounded-full bg-[var(--tg-secondary-bg-color)] text-[var(--tg-text-color)] border border-[var(--tg-hint-color)]">
-                {weekdays.map((d) => t.weekdays[d as keyof typeof t.weekdays] ?? d).join(', ')}
+                {weekdays.map((d) => t(`weekdays.${d}`, d)).join(', ')}
               </span>
             )}
             {dayOfMonth != null && (
               <span className="inline-block text-xs px-2 py-0.5 rounded-full bg-[var(--tg-secondary-bg-color)] text-[var(--tg-text-color)] border border-[var(--tg-hint-color)]">
-                {dayOfMonth} числа
+                {dayOfMonth} {t('reminder.dayOfMonthSuffix')}
               </span>
             )}
           </div>
           {nextAt && (
             <p className="text-xs text-[var(--tg-hint-color)] mt-1.5">
-              Следующее: {nextAt}
+              {t('reminder.nextAt')} {nextAt}
             </p>
           )}
         </div>
         <button
           onClick={handleCancel}
           className="shrink-0 w-8 h-8 flex items-center justify-center rounded-full hover:bg-red-50 active:bg-red-100 text-[var(--tg-destructive-color)] transition-colors"
-          aria-label={t.reminder.cancelled}
+          aria-label={t('reminder.cancelled')}
         >
           ✕
         </button>

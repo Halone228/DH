@@ -9,6 +9,8 @@ use std::time::Duration;
 use anyhow::{Context, Result};
 use clap::Parser;
 use dayhelper_desktop_adapter_sqlite as sqlite;
+use dayhelper_desktop_application::Messages;
+use dayhelper_desktop_domain::Locale;
 use tracing_subscriber::EnvFilter;
 
 use crate::cli::{Cli, Command};
@@ -61,37 +63,34 @@ async fn login(
     label: String,
     server_url: String,
 ) -> Result<()> {
+    let msg = Messages::for_locale(Locale::default());
     let creds = container
         .pair
         .execute(code, label, server_url)
         .await
         .context("pair")?;
-    println!("✓ Paired successfully (user {}).", creds.user_id);
+    println!("{}", msg.format_login_success(creds.user_id));
     println!();
-    println!("Next steps:");
-    println!("  dayhelper-cli daemon");
-    println!();
-    println!("For autostart:");
-    println!("  cp contrib/dayhelper-daemon.service ~/.config/systemd/user/");
-    println!("  systemctl --user enable --now dayhelper-daemon");
+    println!("{}", msg.login_next_step);
     Ok(())
 }
 
 async fn logout(container: Arc<DesktopContainer>) -> Result<()> {
+    let msg = Messages::for_locale(Locale::default());
     container.credentials.clear().await?;
-    println!("credentials cleared");
+    println!("{}", msg.logout_success);
     Ok(())
 }
 
 async fn status(container: Arc<DesktopContainer>) -> Result<()> {
+    let msg = Messages::for_locale(Locale::default());
     match container.credentials.load().await? {
         Some(creds) => {
-            println!("paired: yes");
-            println!("user_id: {}", creds.user_id);
+            println!("{}", msg.format_status_paired(creds.user_id));
             println!("server: {}", creds.server_url);
             println!("paired_at: {}", creds.paired_at);
         }
-        None => println!("paired: no — run `dayhelper-cli login <code>`"),
+        None => println!("{}", msg.status_not_paired),
     }
     Ok(())
 }

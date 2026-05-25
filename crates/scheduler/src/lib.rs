@@ -181,7 +181,7 @@ impl Scheduler {
 
             if let Err(e) = self
                 .nudges
-                .execute(user.id, user.timezone, &settings)
+                .execute(user.id, user.timezone, &settings, user.locale)
                 .await
             {
                 error!(error = %e, user = ?user.id, "schedule nudges failed");

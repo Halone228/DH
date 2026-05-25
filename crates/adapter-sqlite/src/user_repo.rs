@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use chrono_tz::Tz;
-use dayhelper_domain::{TelegramUserId, User, UserId};
+use dayhelper_domain::{Locale, TelegramUserId, User, UserId};
 use dayhelper_ports::{RepoError, UserRepo};
 use sqlx::SqlitePool;
 use uuid::Uuid;
@@ -34,7 +34,7 @@ impl UserRepo for SqliteUserRepo {
         .bind(user.telegram_id.0)
         .bind(user.username.as_deref())
         .bind(tz)
-        .bind(&user.locale)
+        .bind(user.locale.code())
         .execute(&self.pool)
         .await
         .map_err(RepoError::storage)?;
@@ -102,7 +102,7 @@ impl UserRow {
             telegram_id: TelegramUserId(self.telegram_id),
             username: self.username,
             timezone: tz,
-            locale: self.locale,
+            locale: Locale::from_code(&self.locale),
         })
     }
 }

@@ -1,4 +1,4 @@
-import { t } from '../i18n/ru';
+import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 
 interface WelcomeCardProps {
@@ -6,6 +6,7 @@ interface WelcomeCardProps {
 }
 
 export function WelcomeCard({ onCreate }: WelcomeCardProps) {
+  const { t } = useTranslation();
   const navigate = useNavigate();
 
   return (
@@ -14,11 +15,11 @@ export function WelcomeCard({ onCreate }: WelcomeCardProps) {
       <div className="text-5xl mb-4">👋</div>
       <h2 className="text-xl font-semibold mb-2"
           style={{ color: 'var(--tg-text-color)' }}>
-        {t.welcome.title}
+        {t('welcome.title')}
       </h2>
       <p className="mb-8"
          style={{ color: 'var(--tg-hint-color)' }}>
-        {t.welcome.description}
+        {t('welcome.description')}
       </p>
       <div className="flex flex-col gap-3 w-full max-w-xs">
         <button
@@ -29,7 +30,7 @@ export function WelcomeCard({ onCreate }: WelcomeCardProps) {
             color: 'var(--tg-button-text-color)',
           }}
         >
-          {t.welcome.createFirst}
+          {t('welcome.createFirst')}
         </button>
         <div className="flex gap-3">
           <button
@@ -40,7 +41,7 @@ export function WelcomeCard({ onCreate }: WelcomeCardProps) {
               color: 'var(--tg-text-color)',
             }}
           >
-            {t.welcome.hintSettings}
+            {t('welcome.hintSettings')}
           </button>
           <button
             onClick={() => navigate('/profile')}
@@ -50,7 +51,7 @@ export function WelcomeCard({ onCreate }: WelcomeCardProps) {
               color: 'var(--tg-text-color)',
             }}
           >
-            {t.welcome.hintProfile}
+            {t('welcome.hintProfile')}
           </button>
         </div>
       </div>

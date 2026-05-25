@@ -1,14 +1,15 @@
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { api } from '../api/client';
 import { useTelegram } from '../hooks/useTelegram';
 import { RecurrenceForm } from '../components/RecurrenceForm';
 import { WeekdayChips } from '../components/WeekdayChips';
-import { t } from '../i18n/ru';
 
 type RecurrenceKind = 'once' | 'daily' | 'weekly' | 'monthly';
 
 export function CreateReminder() {
+  const { t } = useTranslation();
   const { tg } = useTelegram();
   const navigate = useNavigate();
 
@@ -30,7 +31,7 @@ export function CreateReminder() {
   useEffect(() => {
     if (!tg) return;
     tg.MainButton.setParams({
-      text: t.reminder.createShort,
+      text: t('reminder.createShort'),
       color: 'var(--tg-button-color)',
       text_color: 'var(--tg-button-text-color)',
       is_visible: true,
@@ -80,7 +81,7 @@ export function CreateReminder() {
       tg?.HapticFeedback?.notificationOccurred('success');
       navigate('/');
     } catch {
-      tg?.showAlert?.(t.error.network);
+      tg?.showAlert?.(t('error.network'));
     } finally {
       setSubmitting(false);
     }
@@ -89,19 +90,19 @@ export function CreateReminder() {
   return (
     <div className="px-4 pt-4">
       <h1 className="text-xl font-bold mb-4 text-[var(--tg-text-color)]">
-        {t.reminder.create}
+        {t('reminder.create')}
       </h1>
 
       <div className="space-y-5">
         {/* Text input */}
         <div>
           <label className="block text-sm font-medium text-[var(--tg-text-color)] mb-1.5">
-            {t.reminder.textLabel}
+            {t('reminder.textLabel')}
           </label>
           <textarea
             value={text}
             onChange={(e) => setText(e.target.value)}
-            placeholder={t.reminder.textPlaceholder}
+            placeholder={t('reminder.textPlaceholder')}
             rows={3}
             className="w-full rounded-xl px-3 py-2.5 text-sm bg-[var(--tg-secondary-bg-color)] text-[var(--tg-text-color)] placeholder-[var(--tg-hint-color)] resize-none outline-none focus:ring-2 focus:ring-[var(--tg-button-color)]"
           />
@@ -110,7 +111,7 @@ export function CreateReminder() {
         {/* Recurrence type */}
         <div>
           <label className="block text-sm font-medium text-[var(--tg-text-color)] mb-1.5">
-            {t.reminder.typeLabel}
+            {t('reminder.typeLabel')}
           </label>
           <RecurrenceForm value={recurrence} onChange={setRecurrence} />
         </div>
@@ -119,7 +120,7 @@ export function CreateReminder() {
         {recurrence === 'once' && (
           <div>
             <label className="block text-sm font-medium text-[var(--tg-text-color)] mb-1.5">
-              {t.reminder.dateLabel}
+              {t('reminder.dateLabel')}
             </label>
             <input
               type="date"
@@ -133,7 +134,7 @@ export function CreateReminder() {
         {(recurrence === 'daily' || recurrence === 'weekly' || recurrence === 'monthly' || recurrence === 'once') && (
           <div>
             <label className="block text-sm font-medium text-[var(--tg-text-color)] mb-1.5">
-              {t.reminder.timeLabel}
+              {t('reminder.timeLabel')}
             </label>
             <input
               type="time"
@@ -147,7 +148,7 @@ export function CreateReminder() {
         {recurrence === 'weekly' && (
           <div>
             <label className="block text-sm font-medium text-[var(--tg-text-color)] mb-1.5">
-              {t.reminder.weekdaysLabel}
+              {t('reminder.weekdaysLabel')}
             </label>
             <WeekdayChips selected={weekdays} onChange={setWeekdays} />
           </div>
@@ -156,7 +157,7 @@ export function CreateReminder() {
         {recurrence === 'monthly' && (
           <div>
             <label className="block text-sm font-medium text-[var(--tg-text-color)] mb-1.5">
-              {t.reminder.dayOfMonthLabel}
+              {t('reminder.dayOfMonthLabel')}
             </label>
             <input
               type="number"

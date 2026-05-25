@@ -9,6 +9,7 @@
 //!   3. constructing it once in `app::container` and injecting it where needed.
 
 pub mod errors;
+pub mod l10n;
 pub mod messages;
 pub mod use_cases;
 

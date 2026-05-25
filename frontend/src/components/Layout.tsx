@@ -1,15 +1,16 @@
 import { useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
 import { useTelegram } from '../hooks/useTelegram';
-import { t } from '../i18n/ru';
 
 const NAV_ITEMS = [
-  { path: '/', label: t.nav.main, icon: '📋' },
-  { path: '/settings', label: t.nav.settings, icon: '⚙️' },
-  { path: '/profile', label: t.nav.profile, icon: '👤' },
+  { path: '/', labelKey: 'nav.main', icon: '📋' },
+  { path: '/settings', labelKey: 'nav.settings', icon: '⚙️' },
+  { path: '/profile', labelKey: 'nav.profile', icon: '👤' },
 ] as const;
 
 export function Layout({ children }: { children: React.ReactNode }) {
+  const { t } = useTranslation();
   const location = useLocation();
   const navigate = useNavigate();
   const { tg } = useTelegram();
@@ -49,7 +50,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
                 }`}
               >
                 <span className="text-lg mb-0.5">{item.icon}</span>
-                <span>{item.label}</span>
+                <span>{t(item.labelKey)}</span>
               </button>
             );
           })}

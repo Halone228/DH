@@ -1,4 +1,5 @@
 import { Component, type ReactNode } from 'react';
+import i18n from '../i18n';
 
 interface Props {
   children: ReactNode;
@@ -31,7 +32,7 @@ export class ErrorBoundary extends Component<Props, State> {
             className="text-base mb-4"
             style={{ color: 'var(--tg-text-color)' }}
           >
-            Что-то пошло не так
+            {i18n.t('error.generic')}
           </p>
           <button
             onClick={() => this.setState({ hasError: false })}
@@ -41,7 +42,7 @@ export class ErrorBoundary extends Component<Props, State> {
               color: 'var(--tg-button-text-color)',
             }}
           >
-            Попробовать снова
+            {i18n.t('error.tryAgain')}
           </button>
         </div>
       );

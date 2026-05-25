@@ -5,8 +5,9 @@
 use std::sync::Arc;
 use std::time::Duration;
 
+use dayhelper_desktop_application::Messages;
 use dayhelper_desktop_application::SessionAggregator;
-use dayhelper_desktop_domain::{FocusChange, IdleStatus};
+use dayhelper_desktop_domain::{FocusChange, IdleStatus, Locale};
 use dayhelper_desktop_ports::{IdleDetector, WindowTracker};
 use tokio::signal::unix::{signal, SignalKind};
 use tokio::sync::mpsc;
@@ -24,13 +25,14 @@ pub async fn run(container: Arc<DesktopContainer>, opts: DaemonOptions) -> anyho
     // actionable error early instead of failing every minute.
     let creds = container.credentials.load().await?;
     if creds.is_none() {
+        let msg = Messages::for_locale(Locale::default());
         anyhow::bail!(
-            "Not paired.\n\n\
-             Steps:\n\
-             1. Open your DayHelper bot in Telegram\n\
-             2. Send /pair\n\
-             3. Run: dayhelper-cli login <code>\n\
-             4. Run: dayhelper-cli daemon"
+            "{}\n\nSteps:\n{}\n{}\n{}\n{}",
+            msg.daemon_not_paired,
+            msg.daemon_step1,
+            msg.daemon_step2,
+            msg.daemon_step3,
+            msg.daemon_step4
         );
     }
 
